@@ -12,10 +12,12 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
-  val hosts = opt[List[String]](required = true)
-  val keyspace = opt[String](required = true)
-  val table = opt[String](required = true)
-  val port = opt[Int](default = Some(9042))
+  val hosts = opt[List[String]](required = true, descr = "The cassandra database ip(s). Comma-separated, if there is more then one.")
+  val keyspace = opt[String](required = true, descr = "The name of the keyspace")
+  val table = opt[String](required = true, descr = "The name of the table")
+  val port = opt[Int](default = Some(9042), descr = "Optional, the port, default value is 9042")
+  val progress = opt[Boolean](default = Some(false), descr = "Print the progress to stderr, defaults to false")
+
   verify()
 }
 
@@ -28,17 +30,20 @@ object Main {
       keyspace <- conf.keyspace.get
       table <- conf.table.get
       port <- conf.port.get
+      progress <- conf.progress.get
     } yield {
+      if(progress) Console.err.println(s"Connecting to cassandra")
+
       val (_, session) = Cassandra(hosts, keyspace, port)
       session.execute(s"use $keyspace")
 
-      Await.result(executeQuery(session, table), Duration.Inf)
+      Await.result(executeQuery(session, table, progress), Duration.Inf)
     }
 
     System.exit(0)
   }
 
-  def executeQuery(session: Session, table: String) = {
+  def executeQuery(session: Session, table: String, progress: Boolean) = {
     val columnValues = (row: Row) => {
       row.getColumnDefinitions.iterator().map { definition =>
         Column(definition.getName, row.getString(definition.getName))
@@ -71,12 +76,14 @@ object Main {
       }
     }
 
-    val prettyPrint = (values: List[JsValue]) => {
+    val prettyPrint = (values: Iterable[JsValue]) => {
       values.map(Json.prettyPrint).foreach(println)
     }
 
+    if (progress) Console.err.println(s"Execute query.")
     session.executeAsync(s"select json * from $table;").map { result =>
-      result.toList.flatMap { row =>
+      result.zipWithIndex.flatMap { case (row, index) =>
+        if (progress) Console.err.print(s"$index.")
         columnValues.andThen(columns2Json)(row)
       }
     }.map(prettyPrint)
