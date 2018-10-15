@@ -13,7 +13,7 @@ object Cassandra {
     val clusterBuilder = new Cluster.Builder()
       .addContactPoints(hosts: _*)
       .withPort(port)
-      .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(20000))
+      .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(50000))
       .withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM))
 
     val dcBuilder = dc match {

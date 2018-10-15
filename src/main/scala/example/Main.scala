@@ -32,7 +32,7 @@ object Main {
       port <- conf.port.get
       progress <- conf.progress.get
     } yield {
-      if(progress) Console.err.println(s"Connecting to cassandra")
+      if(progress) Console.err.println(s"Connecting to cassandra.")
 
       val (_, session) = Cassandra(hosts, keyspace, port)
       session.execute(s"use $keyspace")
