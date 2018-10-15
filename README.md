@@ -9,5 +9,5 @@ sbt stage
 
 Execute
 ~~~bash
-./target/universal/stage/bin/extr --hosts localhost,... -k keyspace -t "table" > out 2> err
+./target/universal/stage/bin/extr --hosts localhost,... -k keyspace -t "table" > ouput
 ~~~
