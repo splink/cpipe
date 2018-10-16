@@ -20,17 +20,17 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
   verify()
 }
 
-object Main {
+object Exporter {
   def main(args: Array[String]): Unit = {
     val conf = new Conf(args)
 
     for {
-      hosts <- conf.hosts.get
-      keyspace <- conf.keyspace.get
-      table <- conf.table.get
-      port <- conf.port.get
-      progress <- conf.progress.get
-      fetchSize <- conf.fetchSize.get
+      hosts <- conf.hosts.toOption
+      keyspace <- conf.keyspace.toOption
+      table <- conf.table.toOption
+      port <- conf.port.toOption
+      progress <- conf.progress.toOption
+      fetchSize <- conf.fetchSize.toOption
     } yield {
       if (progress) updateProgress("Connecting to cassandra.")
 
