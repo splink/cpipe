@@ -1,30 +1,56 @@
 package example
 
+import example.Exporter.updateProgress
 import play.api.libs.json.Json
 
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
+
 object Importer {
 
-
   def main(args: Array[String]): Unit = {
-    val frame = new Frame()
-    Source.stdin.getLines().foreach { line =>
-      frame.push(line.toCharArray).foreach { result =>
-        render(result)
+    val conf = new Conf(args)
+
+    for {
+      hosts <- conf.hosts.toOption
+      keyspace <- conf.keyspace.toOption
+      table <- conf.table.toOption
+      port <- conf.port.toOption
+      progress <- conf.progress.toOption
+    } yield {
+      if (progress) updateProgress("Connecting to cassandra.")
+
+      val (cluster, session) = Cassandra(hosts, keyspace, port)
+      session.execute(s"use $keyspace")
+
+      if (progress) updateProgress(s"Connected to cassandra '${cluster.getClusterName}'")
+
+      val start = System.currentTimeMillis()
+
+      val frame = new Frame()
+      Source.stdin.getLines().foreach { line =>
+        frame.push(line.toCharArray).foreach { result =>
+          parse(result).map { json =>
+            Console.println(json)
+            session.execute(s"insert into $table JSON '$json';")
+          }
+        }
       }
+
+      if(progress) Console.err.println(s" \nTook ${(System.currentTimeMillis() - start) / 1000}s\n")
     }
   }
 
-  def render(result: String) = {
+  def parse(result: String) = {
     Try {
       Json.parse(result)
     } match {
       case Success(json) =>
-        Console.println(Json.prettyPrint(json))
+        Some(Json.prettyPrint(json))
       case Failure(e) =>
         Console.err.println(s"Could not parse JSON: '$result' ${e.getMessage}")
+        None
     }
   }
 
