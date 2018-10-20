@@ -1,6 +1,5 @@
 package example
 
-import example.Exporter.updateProgress
 import play.api.libs.json.{JsObject, Json}
 
 import scala.io.Source
@@ -19,12 +18,12 @@ object Importer {
       port <- conf.port.toOption
       progress <- conf.progress.toOption
     } yield {
-      if (progress) updateProgress("Connecting to cassandra.")
+      if (progress) Output("Connecting to cassandra.")
 
       val (cluster, session) = Cassandra(hosts, keyspace, port)
       session.execute(s"use $keyspace")
 
-      if (progress) updateProgress(s"Connected to cassandra '${cluster.getClusterName}'")
+      if (progress) Output(s"Connected to cassandra '${cluster.getClusterName}'")
 
       val start = System.currentTimeMillis()
 
@@ -34,13 +33,13 @@ object Importer {
         frame.push(line.toCharArray).foreach { result =>
           parse(result).map { json =>
             index += 1
-            Console.err.print(s"$index rows.\r")
+            Output(s"$index rows.")
             session.execute(json2Columns(Json.parse(json).as[JsObject], table))
           }
         }
       }
 
-      if (progress) Console.err.println(s" \nTook ${(System.currentTimeMillis() - start) / 1000}s\n")
+      if (progress) Console.err.println(s"\nTook ${(System.currentTimeMillis() - start) / 1000}s")
       System.exit(0)
     }
   }
