@@ -1,7 +1,7 @@
 package example
 
 import example.Exporter.updateProgress
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
@@ -28,18 +28,27 @@ object Importer {
 
       val start = System.currentTimeMillis()
 
+      var index = 0
       val frame = new Frame()
       Source.stdin.getLines().foreach { line =>
         frame.push(line.toCharArray).foreach { result =>
           parse(result).map { json =>
-            Console.println(json)
-            session.execute(s"insert into $table JSON '$json';")
+            index += 1
+            Console.err.print(s"$index rows.\r")
+            session.execute(json2Columns(Json.parse(json).as[JsObject], table))
           }
         }
       }
 
-      if(progress) Console.err.println(s" \nTook ${(System.currentTimeMillis() - start) / 1000}s\n")
+      if (progress) Console.err.println(s" \nTook ${(System.currentTimeMillis() - start) / 1000}s\n")
+      System.exit(0)
     }
+  }
+
+  val json2Columns = (json: JsObject, table: String) => {
+    val fieldNames = json.fields.map(_._1).mkString(",")
+    val fieldValues = json.fields.map(f => s"""'${Json.prettyPrint(f._2).replaceAllLiterally("'", "''")}'""").mkString(",")
+    s"insert into $table ($fieldNames) values ($fieldValues);"
   }
 
   def parse(result: String) = {
