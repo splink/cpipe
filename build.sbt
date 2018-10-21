@@ -18,5 +18,5 @@ lazy val root = (project in file(".")).
       playJson,
       scalaTest % Test,
     ),
-    mainClass in Compile := Some("example.Importer")
+    mainClass in Compile := Some("example.Extr")
   )
