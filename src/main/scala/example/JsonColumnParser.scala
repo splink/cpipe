@@ -13,11 +13,12 @@ object JsonColumnParser {
   case class Column(name: String, value: String)
 
   val escapedString2Json = (s: String) => {
+    val withoutControlChars = s.replaceAll("[\\u0000-\\u001f]", "")
     Try {
-      val unescaped = StringContext.processEscapes(s)
+      val unescaped = StringContext.processEscapes(withoutControlChars)
       Json.parse(unescaped.substring(1, unescaped.length - 1)).as[JsObject]
     }.toOption.getOrElse {
-      Json.parse(s)
+      Json.parse(withoutControlChars)
     }
   }
 
