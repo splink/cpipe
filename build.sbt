@@ -15,6 +15,7 @@ lazy val root = (project in file(".")).
       logback,
       scallop,
       cassandra,
+      lz4,
       playJson,
       scalaTest % Test,
     ),

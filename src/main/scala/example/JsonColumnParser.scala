@@ -12,19 +12,21 @@ object JsonColumnParser {
 
   case class Column(name: String, value: String)
 
+  def stripControlChars(s: String) =
+    s.replaceAll("[\\u0000-\\u001f]", "")
+
   val escapedString2Json = (s: String) => {
-    val withoutControlChars = s.replaceAll("[\\u0000-\\u001f]", "")
     Try {
-      val unescaped = StringContext.processEscapes(withoutControlChars)
+      val unescaped = StringContext.processEscapes(s)
       Json.parse(unescaped.substring(1, unescaped.length - 1)).as[JsObject]
     }.toOption.getOrElse {
-      Json.parse(withoutControlChars)
+      Json.parse(s)
     }
   }
 
   val columns2Json = (columns: Iterator[Column]) => {
     columns.flatMap { case Column(name, value) =>
-      Try(Json.parse(value)) match {
+      Try(Json.parse(stripControlChars(value))) match {
         case Success(json) =>
 
           val map = json.as[JsObject].fields.map { case (fieldName, fieldValue) =>
@@ -47,7 +49,7 @@ object JsonColumnParser {
 
   val string2JsObject = (s: String) => {
     Try {
-      Json.parse(s).as[JsObject]
+      Json.parse(stripControlChars(s)).as[JsObject]
     } match {
       case Success(json) =>
         Some(json)

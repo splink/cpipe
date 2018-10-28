@@ -4,11 +4,13 @@ import com.datastax.driver.core._
 import com.google.common.util.concurrent.{FutureCallback, Futures}
 import play.api.libs.json.Json
 
+import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import JsonColumnParser._
 
 import scala.io.Source
+import scala.language.implicitConversions
 
 object Extr {
 
@@ -26,10 +28,10 @@ object Extr {
     } yield {
       if (progress) Output("Connecting to cassandra.")
 
-      val (cluster, session) = Cassandra(hosts, keyspace, port)
+      val session = Cassandra(hosts, keyspace, port)
       session.execute(s"use $keyspace")
 
-      if (progress) Output(s"Connected to cassandra '${cluster.getClusterName}'")
+      if (progress) Output(s"Connected to cassandra '${session.getCluster.getClusterName}'")
 
       val start = System.currentTimeMillis()
 
@@ -63,10 +65,17 @@ object Extr {
   def exporter(session: Session, table: String, fetchSize: Int, progress: Boolean) = {
     if (progress) Output("Execute query.")
 
-    val statement = new SimpleStatement(s"select json * from $table;").setFetchSize(fetchSize)
+    val statement = new SimpleStatement(s"select json * from $table;")
+      .setFetchSize(fetchSize)
+      .setConsistencyLevel(ConsistencyLevel.ONE)
+      .setReadTimeoutMillis(5.minutes.toMillis.toInt)
+
     val rs = session.execute(statement)
     rs.iterator().asScala.zipWithIndex.flatMap { case (row, index) =>
-      if (rs.getAvailableWithoutFetching < statement.getFetchSize / 2 && !rs.isFullyFetched) rs.fetchMoreResults()
+      if (rs.getAvailableWithoutFetching < statement.getFetchSize / 2 && !rs.isFullyFetched) {
+        if (progress) Output(s"Got $index rows, off to get more...")
+        rs.fetchMoreResults()
+      }
       if (progress) Output(s"$index rows.")
       columnValues.andThen(columns2Json)(row)
     }.foreach { json =>

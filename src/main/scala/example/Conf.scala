@@ -8,7 +8,7 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
   val table = opt[String](required = true, descr = "The name of the table")
   val port = opt[Int](default = Some(9042), descr = "Optional, the port, default value is 9042")
   val progress = opt[Boolean](default = Some(false), descr = "Print the progress to stderr, defaults to false")
-  val fetchSize = opt[Int](default = Some(3000), descr = "The amount of rows which is retrieved simultaneously. Defaults to 3000")
+  val fetchSize = opt[Int](default = Some(5000), descr = "The amount of rows which is retrieved simultaneously. Defaults to 5000")
   val mode = choice(choices = Seq("import", "export"), required = true, descr = "Select either import or export mode")
 
   verify()

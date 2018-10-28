@@ -8,12 +8,13 @@ object Cassandra {
   def apply(hosts: List[String],
             keyspace: String,
             port: Int,
-            dc: Option[String] = None): (Cluster, Session) = {
+            dc: Option[String] = None): Session = {
 
     val clusterBuilder = new Cluster.Builder()
       .addContactPoints(hosts: _*)
+      .withCompression(ProtocolOptions.Compression.LZ4)
       .withPort(port)
-      .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(50000))
+      .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(60000))
       .withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM))
 
     val dcBuilder = dc match {
@@ -27,7 +28,6 @@ object Cassandra {
       case _ => clusterBuilder
     }
 
-    val cluster = dcBuilder.build
-    (cluster, cluster.connect)
+    dcBuilder.build.connect
   }
 }
