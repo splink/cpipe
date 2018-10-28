@@ -4,7 +4,6 @@ import com.datastax.driver.core._
 import com.google.common.util.concurrent.{FutureCallback, Futures}
 import play.api.libs.json.Json
 
-import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import JsonColumnParser._
@@ -66,9 +65,6 @@ object Extr {
     if (progress) Output("Execute query.")
 
     val statement = new SimpleStatement(s"select json * from $table;")
-      .setFetchSize(fetchSize)
-      .setConsistencyLevel(ConsistencyLevel.ONE)
-      .setReadTimeoutMillis(5.minutes.toMillis.toInt)
 
     val rs = session.execute(statement)
     rs.iterator().asScala.zipWithIndex.flatMap { case (row, index) =>

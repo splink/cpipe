@@ -3,7 +3,7 @@ package example
 import java.util.UUID
 
 import com.datastax.driver.core.Row
-import play.api.libs.json.{JsObject, JsValue, Json}
+import play.api.libs.json.{JsObject, JsString, JsValue, Json}
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -60,23 +60,18 @@ object JsonColumnParser {
   }
 
   val json2Query = (json: JsObject, table: String) => {
-    val fieldNames = json.fields.map(f => s""""${f._1}"""").mkString(", ")
+    def sanitize(s: String) =
+      s.replaceAllLiterally("'", "''")
 
-    def sanitize(value: JsValue) = {
-      val valueString = Json.stringify(value).replaceAllLiterally("'", "''")
-      val clean = valueString.replaceAllLiterally("'", "").replaceAllLiterally(""""""", "")
+    def quoteJson(field: JsValue) =
+      if(field.isInstanceOf[JsObject]) {
+        JsString(sanitize(Json.stringify(field)))
+      } else field
 
-      if (Try(UUID.fromString(clean)).isSuccess)
-        clean
-      else if (valueString.startsWith(""""""") && valueString.endsWith("""""""))
-        s"'${valueString.substring(1, valueString.length - 1)}'"
-      else if (valueString.startsWith("""{""") && valueString.endsWith("""}""") && Json.parse(valueString).result.isDefined)
-        s"'$valueString'"
-      else
-        valueString
-    }
+    val sanitizedJson = JsObject(json.fields.map { case (key, value) =>
+        key -> quoteJson(value)
+    })
 
-    val fieldValues = json.fields.map(f => sanitize(f._2)).mkString(", ")
-    s"INSERT INTO $table ($fieldNames) VALUES ($fieldValues);"
+    s"INSERT INTO $table JSON '${Json.stringify(sanitizedJson)}';"
   }
 }
