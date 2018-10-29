@@ -21,14 +21,28 @@ object Extr {
       hosts <- conf.hosts.toOption
       keyspace <- conf.keyspace.toOption
       table <- conf.table.toOption
+      query <- conf.query.toOption
       port <- conf.port.toOption
       progress <- conf.progress.toOption
       fetchSize <- conf.fetchSize.toOption
       mode <- conf.mode.toOption
+      consistencyLevel <- conf.consistencyLevel.toOption.map {
+        case cl if cl == ConsistencyLevel.ANY.name() => ConsistencyLevel.ANY
+        case cl if cl == ConsistencyLevel.ONE.name() => ConsistencyLevel.ONE
+        case cl if cl == ConsistencyLevel.TWO.name() => ConsistencyLevel.TWO
+        case cl if cl == ConsistencyLevel.THREE.name() => ConsistencyLevel.THREE
+        case cl if cl == ConsistencyLevel.QUORUM.name() => ConsistencyLevel.QUORUM
+        case cl if cl == ConsistencyLevel.ALL.name() => ConsistencyLevel.ALL
+        case cl if cl == ConsistencyLevel.LOCAL_QUORUM.name() => ConsistencyLevel.LOCAL_QUORUM
+        case cl if cl == ConsistencyLevel.EACH_QUORUM.name() => ConsistencyLevel.EACH_QUORUM
+        case cl if cl == ConsistencyLevel.SERIAL.name() => ConsistencyLevel.SERIAL
+        case cl if cl == ConsistencyLevel.LOCAL_SERIAL.name() => ConsistencyLevel.LOCAL_SERIAL
+        case cl if cl == ConsistencyLevel.LOCAL_ONE.name() => ConsistencyLevel.LOCAL_ONE
+      }
     } yield {
       if (progress) Output("Connecting to cassandra.")
 
-      val session = Cassandra(hosts, keyspace, port)
+      val session = Cassandra(hosts, keyspace, port, consistencyLevel, fetchSize)
       session.execute(s"use $keyspace")
 
       if (progress) Output(s"Connected to cassandra '${session.getCluster.getClusterName}'")
@@ -40,12 +54,13 @@ object Extr {
           case "import" =>
             importer(session, table, progress)
           case "export" =>
-            exporter(session, table, fetchSize, progress)
+            exporter(session, table, query, progress)
         }
       } match {
         case Success(_) =>
         case Failure(e) =>
-          Console.err.println(s"Error during $mode '${e.getMessage}'")
+          Console.err.println(s"\nError during '$mode': message: '${e.getMessage}'")
+          System.exit(1)
       }
 
       if (progress) Console.err.println(s"\nTook ${(System.currentTimeMillis() - start) / 1000}s")
@@ -68,10 +83,14 @@ object Extr {
     }
   }
 
-  def exporter(session: Session, table: String, fetchSize: Int, progress: Boolean) = {
+  def exporter(session: Session, table: String, query: String, progress: Boolean) = {
     if (progress) Output("Execute query.")
 
-    val statement = new SimpleStatement(s"select json * from $table;")
+    val statement = if(query.nonEmpty) {
+      new SimpleStatement(s"select json * from $table $query;")
+    } else {
+      new SimpleStatement(s"select json * from $table;")
+    }
 
     val rs = session.execute(statement)
     rs.iterator().asScala.zipWithIndex.flatMap { case (row, index) =>

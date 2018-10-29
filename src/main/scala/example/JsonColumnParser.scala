@@ -1,7 +1,5 @@
 package example
 
-import java.util.UUID
-
 import com.datastax.driver.core.Row
 import play.api.libs.json.{JsObject, JsString, JsValue, Json}
 

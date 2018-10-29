@@ -8,6 +8,8 @@ object Cassandra {
   def apply(hosts: List[String],
             keyspace: String,
             port: Int,
+            consistencyLevel: ConsistencyLevel,
+            fetchSize: Int,
             dc: Option[String] = None): Session = {
 
     val clusterBuilder = new Cluster.Builder()
@@ -15,7 +17,7 @@ object Cassandra {
       .withCompression(ProtocolOptions.Compression.LZ4)
       .withPort(port)
       .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(1.minutes.toMillis.toInt))
-      .withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.ONE).setFetchSize(5000))
+      .withQueryOptions(new QueryOptions().setConsistencyLevel(consistencyLevel).setFetchSize(fetchSize))
 
     val dcBuilder = dc match {
       case Some(dcName) =>
