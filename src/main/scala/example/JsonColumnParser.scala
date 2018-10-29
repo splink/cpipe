@@ -66,7 +66,7 @@ object JsonColumnParser {
     def quoteJson(field: JsValue) =
       if(field.isInstanceOf[JsObject]) {
         JsString(sanitize(Json.stringify(field)))
-      } else field
+      } else Json.parse(sanitize(Json.stringify(field)))
 
     val sanitizedJson = JsObject(json.fields.map { case (key, value) =>
         key -> quoteJson(value)

@@ -10,6 +10,7 @@ import JsonColumnParser._
 
 import scala.io.Source
 import scala.language.implicitConversions
+import scala.util.{Failure, Success, Try}
 
 object Extr {
 
@@ -34,11 +35,17 @@ object Extr {
 
       val start = System.currentTimeMillis()
 
-      mode match {
-        case "import" =>
-          importer(session, table, progress)
-        case "export" =>
-          exporter(session, table, fetchSize, progress)
+      Try {
+        mode match {
+          case "import" =>
+            importer(session, table, progress)
+          case "export" =>
+            exporter(session, table, fetchSize, progress)
+        }
+      } match {
+        case Success(_) =>
+        case Failure(e) =>
+          Console.err.println(s"Error during $mode '${e.getMessage}'")
       }
 
       if (progress) Console.err.println(s"\nTook ${(System.currentTimeMillis() - start) / 1000}s")
