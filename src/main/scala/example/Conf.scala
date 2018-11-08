@@ -7,13 +7,27 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   banner(
     """
-      |Export: ./extr --mode export --hosts localhost --keyspace someKeyspace --table someTable --progress
-      |Import: ./extr --mode import --hosts localhost --keyspace someKeyspace --table someTable --progress
+      |Import/export rows from a Cassandra database
+      |
+      |Export:
+      |* export all rows from a table
+      |./extr --mode export --hosts localhost --keyspace someKeyspace --table someTable --progress
+      |* export only rows which pass a filter
+      |./extr --mode export --hosts localhost --keyspace someKeyspace --table someTable --filter "limit 10" --progress
+      |
+      |Import
+      |* import from a file:
+      |cat some.json | ./extr --mode import --hosts localhost --keyspace someKeyspace --table someTable --progress
+      |* import an export
+      |./extr --mode export --hosts remotehost --keyspace someKeyspace --table someTable | ./extr --mode import --hosts localhost --keyspace anotherKeyspace --table someTable --progress
+      |
       |""".stripMargin)
 
   val hosts = opt[List[String]](required = true, descr = "The cassandra ip(s). Comma-separated, if there is more then one.")
   val keyspace = opt[String](required = true, descr = "The name of the keyspace.")
   val table = opt[String](required = true, descr = "The name of the table.")
+  val filter = opt[List[String]](default = Some(Nil), descr = "A custom filter to filter, order or limit the returned rows. For instance: 'where x in (1,2,3) limit 5'")
+
   val port = opt[Int](default = Some(9042), descr = "Optional, the port, default value is 9042.")
   val progress = opt[Boolean](default = Some(false), descr = "Print the progress to stderr.")
   val fetchSize = opt[Int](default = Some(5000), descr = "The amount of rows which is retrieved simultaneously. Defaults to 5000.")
@@ -22,10 +36,9 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
       "SERIAL", "LOCAL_SERIAL", "LOCAL_ONE"), default = Some("LOCAL_QUORUM"),
     descr = "The Consistency level. Defaults to LOCAL_QUORUM.")
   val mode = choice(choices = Seq("import", "export"), required = true, descr = "Select the mode.")
-  val query = opt[String](default = Some(""), descr = "A custom export query filter/ordering/limit. For instance: 'where x in (1,2,3) limit 5'")
 
-  validateOpt (mode, query) {
-    case(Some(m), Some(q)) if m == "import" && q.nonEmpty => Left("A query can only be used in export mode.")
+  validateOpt (mode, filter) {
+    case(Some(m), Some(f)) if m == "import" && f.nonEmpty => Left("A filter can only be used in export mode.")
     case _ => Right(Unit)
   }
 

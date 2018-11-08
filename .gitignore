@@ -5,3 +5,6 @@ project/project/*
 target
 project/target
 project/project/target/
+*.json
+*.sc
+*.sh

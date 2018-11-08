@@ -21,7 +21,7 @@ object Extr {
       hosts <- conf.hosts.toOption
       keyspace <- conf.keyspace.toOption
       table <- conf.table.toOption
-      query <- conf.query.toOption
+      filter <- conf.filter.toOption.map(_.mkString(" "))
       port <- conf.port.toOption
       progress <- conf.progress.toOption
       fetchSize <- conf.fetchSize.toOption
@@ -54,7 +54,7 @@ object Extr {
           case "import" =>
             importer(session, table, progress)
           case "export" =>
-            exporter(session, table, query, progress)
+            exporter(session, table, filter, progress)
         }
       } match {
         case Success(_) =>
@@ -83,14 +83,10 @@ object Extr {
     }
   }
 
-  def exporter(session: Session, table: String, query: String, progress: Boolean) = {
+  def exporter(session: Session, table: String, filter: String, progress: Boolean) = {
     if (progress) Output("Execute query.")
 
-    val statement = if(query.nonEmpty) {
-      new SimpleStatement(s"select json * from $table $query;")
-    } else {
-      new SimpleStatement(s"select json * from $table;")
-    }
+    val statement = new SimpleStatement(s"select json * from $table $filter;")
 
     val rs = session.execute(statement)
     rs.iterator().asScala.zipWithIndex.flatMap { case (row, index) =>
