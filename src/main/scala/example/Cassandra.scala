@@ -8,6 +8,8 @@ object Cassandra {
   def apply(hosts: List[String],
             keyspace: String,
             port: Int,
+            username: String,
+            password: String,
             consistencyLevel: ConsistencyLevel,
             fetchSize: Int,
             dc: Option[String] = None): Session = {
@@ -16,6 +18,7 @@ object Cassandra {
       .addContactPoints(hosts: _*)
       .withCompression(ProtocolOptions.Compression.LZ4)
       .withPort(port)
+      .withCredentials(username, password)
       .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(1.minutes.toMillis.toInt))
       .withQueryOptions(new QueryOptions().setConsistencyLevel(consistencyLevel).setFetchSize(fetchSize))
 

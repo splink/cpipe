@@ -23,6 +23,8 @@ object Extr {
       table <- conf.table.toOption
       filter <- conf.filter.toOption.map(_.mkString(" "))
       port <- conf.port.toOption
+      username <- conf.username.toOption
+      password <- conf.password.toOption
       progress <- conf.progress.toOption
       fetchSize <- conf.fetchSize.toOption
       mode <- conf.mode.toOption
@@ -42,7 +44,7 @@ object Extr {
     } yield {
       if (progress) Output("Connecting to cassandra.")
 
-      val session = Cassandra(hosts, keyspace, port, consistencyLevel, fetchSize)
+      val session = Cassandra(hosts, keyspace, port, username, password, consistencyLevel, fetchSize)
       session.execute(s"use $keyspace")
 
       if (progress) Output(s"Connected to cassandra '${session.getCluster.getClusterName}'")
