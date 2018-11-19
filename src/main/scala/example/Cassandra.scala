@@ -12,11 +12,12 @@ object Cassandra {
             password: String,
             consistencyLevel: ConsistencyLevel,
             fetchSize: Int,
+            useCompression: Boolean = true,
             dc: Option[String] = None): Session = {
 
     val clusterBuilder = new Cluster.Builder()
       .addContactPoints(hosts: _*)
-      .withCompression(ProtocolOptions.Compression.LZ4)
+      .withCompression(if(useCompression) ProtocolOptions.Compression.LZ4 else ProtocolOptions.Compression.NONE)
       .withPort(port)
       .withCredentials(username, password)
       .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(1.minutes.toMillis.toInt))

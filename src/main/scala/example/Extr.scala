@@ -27,6 +27,10 @@ object Extr {
       password <- conf.password.toOption
       progress <- conf.progress.toOption
       fetchSize <- conf.fetchSize.toOption
+      useCompression <- conf.compression.toOption.map {
+        case c if c == "ON" => true
+        case _ => false
+      }
       mode <- conf.mode.toOption
       consistencyLevel <- conf.consistencyLevel.toOption.map {
         case cl if cl == ConsistencyLevel.ANY.name() => ConsistencyLevel.ANY
@@ -44,7 +48,7 @@ object Extr {
     } yield {
       if (progress) Output("Connecting to cassandra.")
 
-      val session = Cassandra(hosts, keyspace, port, username, password, consistencyLevel, fetchSize)
+      val session = Cassandra(hosts, keyspace, port, username, password, consistencyLevel, fetchSize, useCompression)
       session.execute(s"use $keyspace")
 
       if (progress) Output(s"Connected to cassandra '${session.getCluster.getClusterName}'")
@@ -102,15 +106,4 @@ object Extr {
       Console.println(Json.prettyPrint(json))
     }
   }
-
-  implicit def toScalaFuture(resultSet: ResultSetFuture): Future[ResultSet] = {
-    val promise = Promise[ResultSet]
-    Futures.addCallback[ResultSet](resultSet, new FutureCallback[ResultSet] {
-      override def onSuccess(result: ResultSet): Unit = promise.success(result)
-
-      override def onFailure(t: Throwable): Unit = promise.failure(t)
-    })
-    promise.future
-  }
-
 }

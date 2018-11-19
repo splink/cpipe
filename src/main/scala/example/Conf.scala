@@ -34,10 +34,14 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
   val port = opt[Int](default = Some(9042), descr = "Optional, the port, default value is 9042.")
   val progress = opt[Boolean](default = Some(false), descr = "Print the progress to stderr.")
   val fetchSize = opt[Int](default = Some(5000), descr = "The amount of rows which is retrieved simultaneously. Defaults to 5000.")
+
   val consistencyLevel = choice(
     choices = Seq("ANY", "ONE", "TWO", "THREE", "QUORUM", "ALL", "LOCAL_QUORUM", "EACH_QUORUM",
       "SERIAL", "LOCAL_SERIAL", "LOCAL_ONE"), default = Some("LOCAL_QUORUM"),
     descr = "The Consistency level. Defaults to LOCAL_QUORUM.")
+
+  val compression = choice(Seq("ON", "OFF"), default = Some("ON"), descr = "Use LZ4 compression and trade reduced network traffic for CPU cycles. Defaults to ON")
+
   val mode = choice(choices = Seq("import", "export"), required = true, descr = "Select the mode.")
 
   validateOpt (mode, filter) {
