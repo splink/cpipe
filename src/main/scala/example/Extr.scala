@@ -1,13 +1,10 @@
 package example
 
 import com.datastax.driver.core._
-import com.google.common.util.concurrent.{FutureCallback, Futures}
+import example.JsonColumnParser._
 import play.api.libs.json.Json
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{Future, Promise}
-import JsonColumnParser._
-
 import scala.io.Source
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
@@ -60,12 +57,12 @@ object Extr {
           case "import" =>
             importer(session, table, progress)
           case "export" =>
-            exporter(session, table, filter, progress)
+            exporter(session, table, filter, progress, consistencyLevel)
         }
       } match {
         case Success(_) =>
         case Failure(e) =>
-          Console.err.println(s"\nError during '$mode': message: '${e.getMessage}'")
+          Console.err.println(s"\nError during '$mode': message: '${e.getMessage}' ${e.getStackTrace.mkString("\n")}")
           System.exit(1)
       }
 
@@ -75,6 +72,22 @@ object Extr {
     System.exit(0)
   }
 
+  var timestamp = System.currentTimeMillis()
+  var rps = 0
+  var lastRowstamp = 0
+  var rowstamps = List.empty[Int]
+
+  def calcRps(index: Int) = {
+    val nextTimestamp = System.currentTimeMillis()
+    if(nextTimestamp - timestamp > 1000) {
+      val currentRps = index - lastRowstamp
+      rowstamps = (currentRps :: rowstamps).slice(0, 20).sorted
+      rps = if(rowstamps.size > 10) rowstamps(10) else rowstamps.last
+      lastRowstamp = index
+      timestamp = nextTimestamp
+    }
+  }
+
   def importer(session: Session, table: String, progress: Boolean) = {
     var index = 0
     val frame = new JsonFrame()
@@ -82,27 +95,32 @@ object Extr {
       frame.push(line.toCharArray).foreach { result =>
         string2JsObject(result).map { json =>
           index += 1
-          if (progress) Output(s"$index rows.")
+          if (progress) Output(s"$index rows at $rps rows/sec.")
+
+          calcRps(index)
+
           session.execute(json2Query(json, table))
         }
       }
     }
   }
 
-  def exporter(session: Session, table: String, filter: String, progress: Boolean) = {
+  def exporter(session: Session, table: String, filter: String, progress: Boolean, consistencyLevel: ConsistencyLevel) = {
     if (progress) Output("Execute query.")
 
-    val statement = new SimpleStatement(s"select json * from $table $filter;")
+    val statement = new SimpleStatement(s"select * from $table $filter;")
 
     val rs = session.execute(statement)
-    rs.iterator().asScala.zipWithIndex.flatMap { case (row, index) =>
+    rs.iterator().asScala.zipWithIndex.foreach { case (row, index) =>
       if (rs.getAvailableWithoutFetching < statement.getFetchSize / 2 && !rs.isFullyFetched) {
         if (progress) Output(s"Got $index rows, off to get more...")
         rs.fetchMoreResults()
       }
-      if (progress) Output(s"$index rows.")
-      columnValues.andThen(columns2Json)(row)
-    }.foreach { json =>
+      if (progress) Output(s"$index rows at $rps rows/sec.")
+
+      calcRps(index)
+
+      val json = columnValues.andThen(columns2Json)(row)
       Console.println(Json.prettyPrint(json))
     }
   }

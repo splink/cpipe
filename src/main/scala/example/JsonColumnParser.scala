@@ -1,6 +1,7 @@
 package example
 
 import com.datastax.driver.core.Row
+import com.fasterxml.jackson.core.io.JsonStringEncoder
 import play.api.libs.json.{JsObject, JsString, JsValue, Json}
 
 import scala.collection.JavaConverters._
@@ -13,6 +14,9 @@ object JsonColumnParser {
   def stripControlChars(s: String) =
     s.replaceAll("[\\u0000-\\u001f]", "")
 
+  def quoteAsString(s: String) =
+    JsonStringEncoder.getInstance.quoteAsString(s.toString).mkString
+
   val escapedString2Json = (s: String) => {
     Try {
       val unescaped = StringContext.processEscapes(s)
@@ -23,25 +27,21 @@ object JsonColumnParser {
   }
 
   val columns2Json = (columns: Iterator[Column]) => {
-    columns.flatMap { case Column(name, value) =>
+    val xs = columns.flatMap { case Column(name, value) =>
       Try(Json.parse(stripControlChars(value))) match {
         case Success(json) =>
-
-          val map = json.as[JsObject].fields.map { case (fieldName, fieldValue) =>
-            fieldName -> escapedString2Json(fieldValue.toString)
-          }
-
-          Some(JsObject(map))
+          Some(JsObject(Map(name -> json)))
         case Failure(e) =>
-          Console.err.println(s"Could not convert column '$name' to json ${e.getMessage}")
-          None
+          Some(Json.parse(s"""{"$name": "${quoteAsString(value.toString)}"}"""))
       }
     }
+
+    xs.foldLeft(Json.obj())((acc, next) => acc.deepMerge(next.asInstanceOf[JsObject]))
   }
 
   val columnValues = (row: Row) => {
     row.getColumnDefinitions.iterator.asScala.map { definition =>
-      Column(definition.getName, row.getString(definition.getName))
+      Column(definition.getName, row.getObject(definition.getName).toString)
     }
   }
 
