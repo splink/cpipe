@@ -10,6 +10,12 @@ sbt stage
 
 Execute
 
+### See what options are supported
+ ~~~bash
+ ./extr --help
+ ~~~
+
+
 ### Export to JSON
 ~~~bash
 ./extr -m export --hosts localhost -k explore_main_0001 -t contentcontainers3 --progress > ouput
