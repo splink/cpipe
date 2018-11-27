@@ -44,7 +44,7 @@ object Extr {
           System.exit(1)
       }
 
-      if (conf.flags.showProgress) Console.err.println(s"\nTook ${(System.currentTimeMillis() - start) / 1000}s")
+      if (conf.flags.showProgress) Console.err.println(s"\nProcessing ${rps.count} rows took ${(System.currentTimeMillis() - start) / 1000}s")
     }
 
     System.exit(0)
@@ -114,6 +114,7 @@ object Extr {
         }
       }
     }
+    rps.count
   }
 
   def exporter(session: Session, table: String, filter: String, showProgress: Boolean) = {
@@ -127,12 +128,13 @@ object Extr {
         if (showProgress) Output(s"Got $index rows, off to get more...")
         rs.fetchMoreResults()
       }
-      if (showProgress) Output(s"$index rows at $rps rows/sec.")
+      if (showProgress) Output(s"${index + 1} rows at $rps rows/sec.")
 
-      rps.compute(index)
+      rps.compute(index + 1)
 
       val json = row2Json(row)
       Console.println(Json.prettyPrint(json))
     }
+    rps.count
   }
 }

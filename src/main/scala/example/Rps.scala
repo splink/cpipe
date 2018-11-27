@@ -5,7 +5,8 @@ class Rps {
   private var rps = 0
   private var lastRowstamp = 0
   private var rowstamps = List.empty[Int]
-
+  private var callCount = 0
+  def count = callCount
   override def toString = rps.toString
 
   def compute(index: Int) = {
@@ -17,5 +18,6 @@ class Rps {
       lastRowstamp = index
       timestamp = nextTimestamp
     }
+    callCount = index
   }
 }

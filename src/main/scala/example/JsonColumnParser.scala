@@ -21,9 +21,17 @@ object JsonColumnParser {
 
   def row2Json(row: Row) =
     row.getColumnDefinitions.iterator.asScala.flatMap { definition =>
-      column2Json {
-        Column(definition.getName, row.getObject(definition.getName).toString)
+
+      Try(row.getObject(definition.getName).toString) match {
+        case Success(value) =>
+          column2Json {
+            Column(definition.getName, value)
+          }
+        case Failure(e) =>
+          Console.err.println(s"Ooops, reading column '${definition.getName}' produced an error: ${if(e != null) e.getMessage else "null"}")
+          None
       }
+
     }.foldLeft(Json.obj()) { (acc, next) =>
       acc.deepMerge(next.asInstanceOf[JsObject])
     }
