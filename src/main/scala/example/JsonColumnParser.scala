@@ -11,65 +11,56 @@ object JsonColumnParser {
 
   case class Column(name: String, value: String)
 
-  def stripControlChars(s: String) =
-    s.replaceAll("[\\u0000-\\u001f]", "")
-
-  def quoteAsString(s: String) =
-    JsonStringEncoder.getInstance.quoteAsString(s.toString).mkString
-
-  val escapedString2Json = (s: String) => {
-    Try {
-      val unescaped = StringContext.processEscapes(s)
-      Json.parse(unescaped.substring(1, unescaped.length - 1)).as[JsObject]
-    }.toOption.getOrElse {
-      Json.parse(s)
+  def column2Json(column: Column) =
+    Try(Json.parse(stripControlChars(column.value))) match {
+      case Success(json) =>
+        Some(JsObject(Map(column.name -> json)))
+      case Failure(_) =>
+        Some(Json.parse(s"""{"${column.name}": "${quoteAsString(column.value.toString)}"}"""))
     }
-  }
 
-  val columns2Json = (columns: Iterator[Column]) => {
-    val xs = columns.flatMap { case Column(name, value) =>
-      Try(Json.parse(stripControlChars(value))) match {
-        case Success(json) =>
-          Some(JsObject(Map(name -> json)))
-        case Failure(e) =>
-          Some(Json.parse(s"""{"$name": "${quoteAsString(value.toString)}"}"""))
+  def row2Json(row: Row) =
+    row.getColumnDefinitions.iterator.asScala.flatMap { definition =>
+      column2Json {
+        Column(definition.getName, row.getObject(definition.getName).toString)
       }
+    }.foldLeft(Json.obj()) { (acc, next) =>
+      acc.deepMerge(next.asInstanceOf[JsObject])
     }
 
-    xs.foldLeft(Json.obj())((acc, next) => acc.deepMerge(next.asInstanceOf[JsObject]))
-  }
 
-  val columnValues = (row: Row) => {
-    row.getColumnDefinitions.iterator.asScala.map { definition =>
-      Column(definition.getName, row.getObject(definition.getName).toString)
-    }
-  }
-
-  val string2JsObject = (s: String) => {
+  def string2Json(s: String) =
     Try {
       Json.parse(stripControlChars(s)).as[JsObject]
     } match {
       case Success(json) =>
         Some(json)
       case Failure(e) =>
-        Console.err.println(s"Could not parse JSON: '$s' ${e.getMessage}")
+        Console.err.println(s"Could not parse JSON: '$s' ${if (e != null) e.getMessage else "null"}")
         None
     }
-  }
 
-  val json2Query = (json: JsObject, table: String) => {
+  def json2Query(json: JsObject, table: String) = {
     def sanitize(s: String) =
       s.replaceAllLiterally("'", "''")
 
     def quoteJson(field: JsValue) =
-      if(field.isInstanceOf[JsObject]) {
+      if (field.isInstanceOf[JsObject]) {
         JsString(sanitize(Json.stringify(field)))
       } else Json.parse(sanitize(Json.stringify(field)))
 
     val sanitizedJson = JsObject(json.fields.map { case (key, value) =>
-        key -> quoteJson(value)
+      key -> quoteJson(value)
     })
 
     s"INSERT INTO $table JSON '${Json.stringify(sanitizedJson)}';"
   }
+
+
+  def stripControlChars(s: String) =
+    s.replaceAll("[\\u0000-\\u001f]", "")
+
+  def quoteAsString(s: String) =
+    JsonStringEncoder.getInstance.quoteAsString(s.toString).mkString
+
 }

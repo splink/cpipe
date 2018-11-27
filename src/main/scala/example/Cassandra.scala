@@ -20,7 +20,7 @@ object Cassandra {
       .withCompression(if(useCompression) ProtocolOptions.Compression.LZ4 else ProtocolOptions.Compression.NONE)
       .withPort(port)
       .withCredentials(username, password)
-      .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(1.minutes.toMillis.toInt))
+      .withSocketOptions(new SocketOptions().setKeepAlive(true).setReadTimeoutMillis(1.minute.toMillis.toInt))
       .withQueryOptions(new QueryOptions().setConsistencyLevel(consistencyLevel).setFetchSize(fetchSize))
 
     val dcBuilder = dc match {

@@ -10,10 +10,47 @@ import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
 object Extr {
+  case class Connection(hosts: List[String], port: Int)
+  case class Selection(keyspace: String, table: String, filter: String)
+  case class Credentials(username: String, password: String)
+  case class Flags(showProgress: Boolean, useCompression: Boolean)
+  case class Settings(fetchSize: Int, consistencyLevel: ConsistencyLevel)
+  case class Configuration(mode: String, connection: Connection, selection: Selection, credentials: Credentials, flags: Flags, settings: Settings)
+
+  val rps = new Rps()
 
   def main(args: Array[String]): Unit = {
-    val conf = new Conf(args)
+    parseArguments(new Conf(args)).foreach { conf =>
+      if (conf.flags.showProgress) Output("Connecting to cassandra.")
 
+      val session = createSessionFrom(conf)
+      session.execute(s"use ${conf.selection.keyspace}")
+
+      if (conf.flags.showProgress) Output(s"Connected to cassandra ${session.getCluster.getClusterName}")
+
+      val start = System.currentTimeMillis()
+
+      Try {
+        conf.mode match {
+          case "import" =>
+            importer(session, conf.selection.table, conf.flags.showProgress)
+          case "export" =>
+            exporter(session, conf.selection.table, conf.selection.filter, conf.flags.showProgress)
+        }
+      } match {
+        case Success(_) =>
+        case Failure(e) =>
+          Console.err.println(s"\nError during '${conf.mode}': message: '${e.getMessage}' ${e.getStackTrace.mkString("\n")}")
+          System.exit(1)
+      }
+
+      if (conf.flags.showProgress) Console.err.println(s"\nTook ${(System.currentTimeMillis() - start) / 1000}s")
+    }
+
+    System.exit(0)
+  }
+
+  def parseArguments(conf: Conf) =
     for {
       hosts <- conf.hosts.toOption
       keyspace <- conf.keyspace.toOption
@@ -43,61 +80,35 @@ object Extr {
         case cl if cl == ConsistencyLevel.LOCAL_ONE.name() => ConsistencyLevel.LOCAL_ONE
       }
     } yield {
-      if (progress) Output("Connecting to cassandra.")
-
-      val session = Cassandra(hosts, keyspace, port, username, password, consistencyLevel, fetchSize, useCompression)
-      session.execute(s"use $keyspace")
-
-      if (progress) Output(s"Connected to cassandra '${session.getCluster.getClusterName}'")
-
-      val start = System.currentTimeMillis()
-
-      Try {
-        mode match {
-          case "import" =>
-            importer(session, table, progress)
-          case "export" =>
-            exporter(session, table, filter, progress, consistencyLevel)
-        }
-      } match {
-        case Success(_) =>
-        case Failure(e) =>
-          Console.err.println(s"\nError during '$mode': message: '${e.getMessage}' ${e.getStackTrace.mkString("\n")}")
-          System.exit(1)
-      }
-
-      if (progress) Console.err.println(s"\nTook ${(System.currentTimeMillis() - start) / 1000}s")
+      Configuration(mode,
+        Connection(hosts, port),
+        Selection(keyspace, table, filter),
+        Credentials(username, password),
+        Flags(progress, useCompression),
+        Settings(fetchSize, consistencyLevel))
     }
 
-    System.exit(0)
-  }
+  def createSessionFrom(conf: Configuration) = Cassandra(
+    conf.connection.hosts,
+    conf.selection.keyspace,
+    conf.connection.port,
+    conf.credentials.username,
+    conf.credentials.password,
+    conf.settings.consistencyLevel,
+    conf.settings.fetchSize,
+    conf.flags.useCompression)
 
-  var timestamp = System.currentTimeMillis()
-  var rps = 0
-  var lastRowstamp = 0
-  var rowstamps = List.empty[Int]
 
-  def calcRps(index: Int) = {
-    val nextTimestamp = System.currentTimeMillis()
-    if(nextTimestamp - timestamp > 1000) {
-      val currentRps = index - lastRowstamp
-      rowstamps = (currentRps :: rowstamps).slice(0, 20).sorted
-      rps = if(rowstamps.size > 10) rowstamps(10) else rowstamps.last
-      lastRowstamp = index
-      timestamp = nextTimestamp
-    }
-  }
-
-  def importer(session: Session, table: String, progress: Boolean) = {
+  def importer(session: Session, table: String, showProgress: Boolean) = {
     var index = 0
     val frame = new JsonFrame()
     Source.stdin.getLines().foreach { line =>
       frame.push(line.toCharArray).foreach { result =>
-        string2JsObject(result).map { json =>
+        string2Json(result).map { json =>
           index += 1
-          if (progress) Output(s"$index rows at $rps rows/sec.")
+          if (showProgress) Output(s"$index rows at $rps rows/sec.")
 
-          calcRps(index)
+          rps.compute(index)
 
           session.execute(json2Query(json, table))
         }
@@ -105,22 +116,22 @@ object Extr {
     }
   }
 
-  def exporter(session: Session, table: String, filter: String, progress: Boolean, consistencyLevel: ConsistencyLevel) = {
-    if (progress) Output("Execute query.")
+  def exporter(session: Session, table: String, filter: String, showProgress: Boolean) = {
+    if (showProgress) Output("Execute query.")
 
     val statement = new SimpleStatement(s"select * from $table $filter;")
 
     val rs = session.execute(statement)
     rs.iterator().asScala.zipWithIndex.foreach { case (row, index) =>
       if (rs.getAvailableWithoutFetching < statement.getFetchSize / 2 && !rs.isFullyFetched) {
-        if (progress) Output(s"Got $index rows, off to get more...")
+        if (showProgress) Output(s"Got $index rows, off to get more...")
         rs.fetchMoreResults()
       }
-      if (progress) Output(s"$index rows at $rps rows/sec.")
+      if (showProgress) Output(s"$index rows at $rps rows/sec.")
 
-      calcRps(index)
+      rps.compute(index)
 
-      val json = columnValues.andThen(columns2Json)(row)
+      val json = row2Json(row)
       Console.println(Json.prettyPrint(json))
     }
   }
