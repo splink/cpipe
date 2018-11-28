@@ -14,8 +14,16 @@ object JsonColumnParser {
   def column2Json(column: Column) =
     Try(Json.parse(stripControlChars(column.value))) match {
       case Success(json) =>
-        Some(JsObject(Map(column.name -> json)))
+        Console.err.println(s"A~~> ${column.name} -> $json")
+        val r = json match {
+          case o: JsObject => o
+          case x => Json.parse(quoteAsString(x.toString()))
+        }
+        Some(JsObject(Map(column.name -> r)))
+
+        //Some(JsObject(Map(column.name -> json)))
       case Failure(_) =>
+        Console.err.println(s"B~~> ${column.name} -> ${quoteAsString(column.value.toString)}")
         Some(Json.parse(s"""{"${column.name}": "${quoteAsString(column.value.toString)}"}"""))
     }
 
