@@ -1,47 +1,45 @@
 package example
 
-import com.datastax.driver.core.Row
-import com.fasterxml.jackson.core.io.JsonStringEncoder
-import play.api.libs.json.{JsObject, JsString, JsValue, Json}
+import com.datastax.driver.core.{DataType, Row}
+import play.api.libs.json._
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 object JsonColumnParser {
 
-  case class Column(name: String, value: String)
+  case class Column(name: String, value: String, typ: DataType)
 
-  def column2Json(column: Column) =
-    Try(Json.parse(stripControlChars(column.value))) match {
+  def column2Json(column: Column) = {
+    val sanitized = stripControlChars(column.value)
+    Try(Json.parse(sanitized)) match {
       case Success(json) =>
-        Console.err.println(s"A~~> ${column.name} -> $json")
         val r = json match {
           case o: JsObject => o
-          case x => Json.parse(quoteAsString(x.toString()))
+          case _ => parseCassandraDataType(sanitized, column.typ)
         }
+
         Some(JsObject(Map(column.name -> r)))
 
-        //Some(JsObject(Map(column.name -> json)))
       case Failure(_) =>
-        Console.err.println(s"B~~> ${column.name} -> ${quoteAsString(column.value.toString)}")
-        Some(Json.parse(s"""{"${column.name}": "${quoteAsString(column.value.toString)}"}"""))
+        Some(JsObject(Map(column.name -> parseCassandraDataType(sanitized, column.typ))))
     }
+  }
 
   def row2Json(row: Row) =
     row.getColumnDefinitions.iterator.asScala.flatMap { definition =>
-
       Try(row.getObject(definition.getName).toString) match {
         case Success(value) =>
           column2Json {
-            Column(definition.getName, value)
+            Column(definition.getName, value, definition.getType)
           }
         case Failure(e) =>
-          Console.err.println(s"Ooops, reading column '${definition.getName}' produced an error: ${if(e != null) e.getMessage else "null"}")
+          Console.err.println(s"Ooops, reading column '${definition.getName}' produced an error: ${if (e != null) e.getMessage else "null"}")
           None
       }
 
     }.foldLeft(Json.obj()) { (acc, next) =>
-      acc.deepMerge(next.asInstanceOf[JsObject])
+      acc.deepMerge(next)
     }
 
 
@@ -63,7 +61,9 @@ object JsonColumnParser {
     def quoteJson(field: JsValue) =
       if (field.isInstanceOf[JsObject]) {
         JsString(sanitize(Json.stringify(field)))
-      } else Json.parse(sanitize(Json.stringify(field)))
+      } else {
+        Json.parse(sanitize(Json.stringify(field)))
+      }
 
     val sanitizedJson = JsObject(json.fields.map { case (key, value) =>
       key -> quoteJson(value)
@@ -73,10 +73,39 @@ object JsonColumnParser {
   }
 
 
+  import java.util.regex.Pattern
+
+  val pattern = Pattern.compile("[\\u0000-\\u001f]")
+
   def stripControlChars(s: String) =
-    s.replaceAll("[\\u0000-\\u001f]", "")
+    pattern.matcher(s).replaceAll("")
 
-  def quoteAsString(s: String) =
-    JsonStringEncoder.getInstance.quoteAsString(s.toString).mkString
-
+  def parseCassandraDataType(a: String, dt: DataType) =
+    dt.getName match {
+      case DataType.Name.ASCII => JsString(a)
+      case DataType.Name.BLOB => JsString(a)
+      case DataType.Name.DATE => JsString(a)
+      case DataType.Name.INET => JsString(a)
+      case DataType.Name.TEXT => JsString(a)
+      case DataType.Name.TIME => JsString(a)
+      case DataType.Name.TIMESTAMP => JsString(a)
+      case DataType.Name.TIMEUUID => JsString(a)
+      case DataType.Name.UUID => JsString(a)
+      case DataType.Name.VARCHAR => JsString(a)
+      case DataType.Name.BOOLEAN => JsBoolean(a == "true")
+      case DataType.Name.BIGINT => JsNumber(BigDecimal(a))
+      case DataType.Name.DECIMAL => JsNumber(BigDecimal(a))
+      case DataType.Name.DOUBLE => JsNumber(BigDecimal(a))
+      case DataType.Name.FLOAT => JsNumber(BigDecimal(a))
+      case DataType.Name.INT => JsNumber(BigDecimal(a))
+      case DataType.Name.SMALLINT => JsNumber(BigDecimal(a))
+      case DataType.Name.TINYINT => JsNumber(BigDecimal(a))
+      case DataType.Name.VARINT => JsNumber(BigDecimal(a))
+      case DataType.Name.LIST => Json.parse(a)
+      case DataType.Name.MAP => Json.parse(a)
+      case DataType.Name.SET => Json.parse(a)
+      case DataType.Name.TUPLE => Json.parse(a)
+      case DataType.Name.UDT => Json.parse(a)
+      case _ => Json.parse(a)
+    }
 }
