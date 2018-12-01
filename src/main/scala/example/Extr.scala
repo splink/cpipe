@@ -1,13 +1,20 @@
 package example
 
+import java.time.format.DateTimeFormatter
+
 import com.datastax.driver.core._
+import com.google.common.util.concurrent.{FutureCallback, Futures}
 import example.JsonColumnParser._
 import play.api.libs.json.Json
 
 import scala.collection.JavaConverters._
+import scala.concurrent.{Await, Future, Promise}
 import scala.io.Source
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.control.NonFatal
+import scala.concurrent.duration.Duration._
 
 object Extr {
   case class Connection(hosts: List[String], port: Int)
@@ -35,7 +42,11 @@ object Extr {
           case "import" =>
             importer(session, conf.selection.table, conf.flags.showProgress)
           case "export" =>
-            exporter(session, conf.selection.table, conf.selection.filter, conf.flags.showProgress)
+              exporter(session, conf.selection.table, conf.selection.filter, conf.flags.showProgress)
+          case "export2" =>
+            Await.result(
+              exporter2(session, conf.selection.keyspace, conf.selection.table, conf.selection.filter, conf.flags.showProgress),
+              Inf)
         }
       } match {
         case Success(_) =>
@@ -44,7 +55,10 @@ object Extr {
           System.exit(1)
       }
 
-      if (conf.flags.showProgress) Console.err.println(s"\nProcessing ${rps.count} rows took ${(System.currentTimeMillis() - start) / 1000}s")
+      if (conf.flags.showProgress) {
+        val sec = (System.currentTimeMillis() - start) / 1000
+        Console.err.println(s"\nProcessing ${rps.count} rows took ${ElapsedSecondFormat(sec)}s")
+      }
     }
 
     System.exit(0)
@@ -100,15 +114,13 @@ object Extr {
 
 
   def importer(session: Session, table: String, showProgress: Boolean) = {
-    var index = 0
     val frame = new JsonFrame()
     Source.stdin.getLines().foreach { line =>
       frame.push(line.toCharArray).foreach { result =>
         string2Json(result).map { json =>
-          index += 1
-          if (showProgress) Output(s"$index rows at $rps rows/sec.")
 
-          rps.compute(index)
+          rps.compute()
+          if (showProgress) Output(s"${rps.count} rows at $rps rows/sec.")
 
           session.execute(json2Query(json, table))
         }
@@ -123,18 +135,85 @@ object Extr {
     val statement = new SimpleStatement(s"select * from $table $filter;")
 
     val rs = session.execute(statement)
-    rs.iterator().asScala.zipWithIndex.foreach { case (row, index) =>
+    rs.iterator().asScala.foreach { row =>
       if (rs.getAvailableWithoutFetching < statement.getFetchSize / 2 && !rs.isFullyFetched) {
-        if (showProgress) Output(s"Got $index rows, off to get more...")
+        if (showProgress) Output(s"Got ${rps.count} rows, off to get more...")
         rs.fetchMoreResults()
       }
-      if (showProgress) Output(s"${index + 1} rows at $rps rows/sec.")
 
-      rps.compute(index + 1)
+      rps.compute()
+      if (showProgress) Output(s"${rps.count} rows at $rps rows/sec.")
 
       val json = row2Json(row)
       Console.println(Json.prettyPrint(json))
     }
     rps.count
   }
+
+  def exporter2(session: Session, keyspace:String, table: String, filter: String, showProgress: Boolean) = {
+    if (showProgress) Output("Execute query.")
+
+    val meta = session.getCluster.getMetadata
+    val keys = meta.getKeyspace(keyspace).getTable(table).getPartitionKey.asScala.map(key => key.getName)
+
+    val tokenId = s"token(${keys.mkString(",")})"
+
+    if (showProgress) Output("Got tokens.")
+
+    val unwrappedRanges = meta.getTokenRanges.asScala.toList.flatMap { range =>
+      range.unwrap().asScala.toList
+    }.grouped(8).toList
+
+    def execute(groups: List[List[TokenRange]]): Future[Unit] = {
+      groups match {
+        case Nil =>
+          Future.successful(())
+        case head :: tail =>
+          Future.traverse(head) { range =>
+            fetchRow(session, range, table, tokenId, filter, showProgress).map { itr =>
+              itr.foreach { json =>
+                Console.println(Json.prettyPrint(json))
+              }
+            }
+          }.map { _ =>
+              execute(tail)
+          }.recover {
+            case NonFatal(e) =>
+              Console.err.println(s"An error occurred $e")
+              execute(groups)
+          }.flatten
+      }
+
+    }
+    execute(unwrappedRanges)
+  }
+
+  def fetchRow(session: Session, range: TokenRange, table: String, tokenId: String, filter: String, showProgress: Boolean) = {
+    val query = s"select * from $table where $tokenId > ${range.getStart} and $tokenId <= ${range.getEnd};"
+    val statement = new SimpleStatement(query)
+    session.executeAsync(statement).map { rs =>
+      rs.iterator().asScala.map { row =>
+        rps.compute()
+        if (showProgress) Output(s"${rps.count} rows at $rps rows/sec.")
+        row2Json(row)
+      }
+    }
+  }
+
+  implicit def asFuture(resultSet: ResultSetFuture): Future[ResultSet] = {
+    val promise = Promise[ResultSet]
+    Futures.addCallback[ResultSet](resultSet, new FutureCallback[ResultSet] {
+      override def onSuccess(result: ResultSet): Unit = promise.success(result)
+      override def onFailure(t: Throwable): Unit = promise.failure(t)
+    })
+    promise.future
+  }
+
+  object ElapsedSecondFormat {
+    def zero(i: Long) = if (i < 10) s"0$i" else s"$i"
+
+    def apply(s: Long) =
+      s"""${zero(s / 3600)}:${zero((s % 3600) / 60)}:${zero(s % 60)}"""
+  }
+
 }

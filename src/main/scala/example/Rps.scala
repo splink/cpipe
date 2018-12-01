@@ -1,6 +1,7 @@
 package example
 
 class Rps {
+  private var index = 0
   private var timestamp = System.currentTimeMillis()
   private var rps = 0
   private var lastRowstamp = 0
@@ -9,7 +10,8 @@ class Rps {
   def count = callCount
   override def toString = rps.toString
 
-  def compute(index: Int) = {
+  def compute() = {
+    index = index + 1
     val nextTimestamp = System.currentTimeMillis()
     if(nextTimestamp - timestamp > 1000) {
       val currentRps = index - lastRowstamp

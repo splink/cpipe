@@ -42,7 +42,7 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   val compression = choice(Seq("ON", "OFF"), default = Some("ON"), descr = "Use LZ4 compression and trade reduced network traffic for CPU cycles. Defaults to ON")
 
-  val mode = choice(choices = Seq("import", "export"), required = true, descr = "Select the mode.")
+  val mode = choice(choices = Seq("import", "export", "export2"), required = true, descr = "Select the mode.")
 
   validateOpt (mode, filter) {
     case(Some(m), Some(f)) if m == "import" && f.nonEmpty => Left("A filter can only be used in export mode.")
