@@ -1,5 +1,4 @@
 package example
-
 object Output {
   var lastLength = 0
   def apply(s: String) = {
