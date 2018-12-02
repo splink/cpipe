@@ -1,5 +1,7 @@
 package example
 
+import java.util
+
 import com.datastax.driver.core._
 import com.google.common.util.concurrent.{FutureCallback, Futures}
 import example.JsonColumnParser._
@@ -152,33 +154,51 @@ object Extr {
   }
 
   def exporter2(session: Session, keyspace:String, table: String, threads: Int, showProgress: Boolean) = {
-    if (showProgress) Output("Execute query.")
 
     val meta = session.getCluster.getMetadata
     val keys = meta.getKeyspace(keyspace).getTable(table).getPartitionKey.asScala.map(key => key.getName)
 
     val tokenId = s"token(${keys.mkString(",")})"
 
-    if (showProgress) Output("Got tokens.")
-
     val unwrappedRanges = meta.getTokenRanges.asScala.toList.flatMap { range =>
       range.unwrap().asScala.toList
-    }.grouped(threads).toList
+    }.sorted.grouped(threads).toList
+
+    val tokenRanges = meta.getTokenRanges.asScala.toList.flatMap { range =>
+      range.unwrap().asScala.toList
+    }.sorted.map { range =>
+      range -> session.getCluster.getMetadata.getReplicas(keyspace, range).asScala.head
+    }.groupBy(_._2).mapValues { values =>
+      values.sortBy(_._1).foldLeft(List.empty[TokenRange])((acc, next) => {
+        //TODO build range until fail, then start building next range, so we end up with a Map[Host, List[TokenRange]]], then join the lists and query way fewer tokenranges
+          acc match {
+            case Nil =>
+              next._1 :: Nil
+            case head :: tail =>
+              Try {
+                head.mergeWith(next._1) :: tail
+              } match {
+                case Success(merged) =>
+                  merged
+                case Failure(e) =>
+                  next._1 :: acc
+              }
+          }
+      })
+    }.flatMap(_._2).toList.grouped(threads).toList
+
+    Console.err.println(unwrappedRanges.size + " ~~~~>" + tokenRanges.size + s" * $threads tokenRanges")
+
+    if (showProgress) Output(s"Got tokens, now execute ${unwrappedRanges.size} * $threads queries.")
+
+    Console.err.println(s"Instead of ${unwrappedRanges.size}, process ${tokenRanges.size}")
 
     def execute(groups: List[List[TokenRange]]): Future[Unit] = {
       groups match {
         case Nil =>
           Future.successful(())
         case head :: tail =>
-          Future.traverse(head) { range =>
-            fetchRow(session, range, table, tokenId, showProgress).map { results =>
-              Future {
-                Console.println(
-                  results.map(Json.prettyPrint).mkString("\n")
-                )
-              }
-            }
-          }.map { _ =>
+          fetchNextGroup(head).map { _ =>
               execute(tail)
           }.recover {
             case NonFatal(e) =>
@@ -190,20 +210,47 @@ object Extr {
       }
     }
 
-    def fetchRow(session: Session, range: TokenRange, table: String, tokenId: String, showProgress: Boolean) = {
+    def fetchNextGroup(group: List[TokenRange]) = {
+      Future.traverse(group) { range =>
+        fetchRows(range).flatMap {
+          case results if results.nonEmpty =>
+            Console.err.println(s"Got ${results.size} results...")
+            Future {
+              Console.println(
+                results.map(Json.prettyPrint).mkString("\n")
+              )
+            }
+          case _ =>
+            Console.err.println(s"Skip empty results... for range ${range.getStart} - ${range.getEnd}")
+            Future.successful(())
+        }.recover {
+          case NonFatal(e) =>
+            Console.err.println(s"Ooops, could not fetch a row. message: ${if (e != null) e.getMessage else ""}")
+            Future.successful(())
+        }
+      }
+    }
+
+    def fetchRows(range: TokenRange) = {
       val statement = new SimpleStatement(
         s"select * from $table where $tokenId > ${range.getStart} and $tokenId <= ${range.getEnd};")
 
       session.executeAsync(statement).map { rs =>
         rs.iterator().asScala.map { row =>
+          if (rs.getAvailableWithoutFetching < statement.getFetchSize / 2 && !rs.isFullyFetched) {
+            if (showProgress) Output(s"Got ${rps.count} rows, off to get more...")
+            rs.fetchMoreResults()
+          }
+
           rps.compute()
           if (showProgress) Output(s"${rps.count} rows at $rps rows/sec.")
+
           row2Json(row)
         }
       }
     }
 
-    execute(unwrappedRanges)
+    execute(tokenRanges)
   }
 
   implicit def asFuture(resultSet: ResultSetFuture): Future[ResultSet] = {

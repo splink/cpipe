@@ -16,7 +16,7 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
       |* export only rows which pass a filter
       |./extr --mode export --hosts localhost --keyspace someKeyspace --table someTable --filter "limit 10"
       |
-      |* export all rows from a table using token ranges which is faster for tables > 10000 rows
+      |* export all rows from a table using token ranges which is faster for large tables
       |./extr --mode export2 --hosts localhost --keyspace someKeyspace --table someTable
       |
       |Import
@@ -55,7 +55,7 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
   val fetchSize = opt[Int](default = Some(5000),
     descr = "The amount of rows which is retrieved simultaneously. Defaults to 5000.")
 
-  val threads = opt[Int](default = Some(8),
+  val threads = opt[Int](default = Some(32),
     descr = "The amount of parallelism during used in export2 mode")
 
   val consistencyLevel = choice(
@@ -70,7 +70,7 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     descr = "Select the mode. Choose mode 'import' to import data. " +
       "Choose mode 'export' to export data (optional with a filter); " +
       "Choose mode 'export2' to export data using token ranges to increase performance and reduce load on the cluster. " +
-      "'export2' mode cannot be combined with a filter. 'export2' is NOT faster if the tables are small (< 10000 rows) ")
+      "'export2' mode cannot be combined with a filter. 'export2' is only faster if the table is large")
 
   validateOpt (mode, filter) {
     case(Some(m), Some(f)) if m == "import" && f.nonEmpty => Left("A filter can not be used in import mode.")
