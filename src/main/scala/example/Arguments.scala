@@ -2,7 +2,7 @@ package example
 
 import org.rogach.scallop.ScallopConf
 
-class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
+class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
   version("Extr 49386")
 
   banner(
@@ -55,8 +55,8 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
   val fetchSize = opt[Int](default = Some(5000),
     descr = "The amount of rows which is retrieved simultaneously. Defaults to 5000.")
 
-  val threads = opt[Int](default = Some(32),
-    descr = "The amount of parallelism during used in export2 mode")
+  val threads = opt[Int](default = Some(64),
+    descr = "The amount of parallelism during used in export2 mode. Defaults to 64 parallel requests.")
 
   val consistencyLevel = choice(
     choices = Seq("ANY", "ONE", "TWO", "THREE", "QUORUM", "ALL", "LOCAL_QUORUM", "EACH_QUORUM",
