@@ -12,6 +12,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class Exporter2 extends Processor {
+
   import example.JsonColumnParser._
 
   val rps = new Rps()
@@ -25,12 +26,22 @@ class Exporter2 extends Processor {
 
     val tokenId = s"token(${keys.mkString(",")})"
 
-    val unwrappedRanges = meta.getTokenRanges.asScala.toList.flatMap { range =>
-      range.unwrap().asScala.toList
+    Console.err.println(s"data is spread across ${meta.getAllHosts.size} hosts")
+
+    val groupedRanges = meta.getAllHosts.asScala.map { host =>
+      host -> meta.getTokenRanges(config.selection.keyspace, host).asScala.toList.flatMap(_.unwrap().asScala)
+    }.toMap
+
+    Console.err.println(s"Got ${groupedRanges.size} grouped ranges")
+
+    val compactedRanges = Compact(groupedRanges).foldLeft(List.empty[TokenRange]) { case (acc, (_, ranges)) =>
+      ranges ::: acc
     }.sorted.grouped(config.settings.threads).toList
 
+    Console.err.println(s"Got ${compactedRanges.size} compacted ranges")
+
     if (showProgress)
-      Output(s"Got tokens, now execute ${unwrappedRanges.size} * ${config.settings.threads} queries.")
+      Output(s"Query ${compactedRanges.size * config.settings.threads} ranges, ${config.settings.threads} in parallel.")
 
     def execute(groups: List[List[TokenRange]]): Future[Unit] = {
       groups match {
@@ -42,7 +53,7 @@ class Exporter2 extends Processor {
           }.recover {
             case NonFatal(e) =>
               Console.err.println(
-                s"\nError during 'import': message: '${if(e != null) e.getMessage else ""}'")
+                s"\nError during 'import': message: '${if (e != null) e.getMessage else ""}'")
               //TODO add counter to give up after a couple of retries
               execute(groups)
           }.flatten
@@ -54,9 +65,11 @@ class Exporter2 extends Processor {
         fetchRows(range).flatMap {
           case results if results.nonEmpty =>
             Future {
-              Console.println(
-                results.map(Json.prettyPrint).mkString("\n")
-              )
+              results.grouped(100).foreach { group =>
+                Console.println(
+                  group.map(Json.prettyPrint).mkString("\n")
+                )
+              }
             }
           case _ =>
             Future.successful(())
@@ -87,7 +100,7 @@ class Exporter2 extends Processor {
       }
     }
 
-    Await.result(execute(unwrappedRanges), Inf)
+    Await.result(execute(compactedRanges), Inf)
 
     rps.count
   }
@@ -96,6 +109,7 @@ class Exporter2 extends Processor {
     val promise = Promise[ResultSet]
     Futures.addCallback[ResultSet](resultSet, new FutureCallback[ResultSet] {
       override def onSuccess(result: ResultSet): Unit = promise.success(result)
+
       override def onFailure(t: Throwable): Unit = promise.failure(t)
     })
     promise.future
