@@ -33,22 +33,9 @@ class Exporter2 extends Processor {
       Set(meta.getReplicas(config.selection.keyspace, range).asScala.head) -> range
     }
 
-    var compactedRanges = Compact(rangesByHost).foldLeft(List.empty[TokenRange]) { case (acc, (_, ranges)) =>
+    val compactedRanges = Compact(rangesByHost).foldLeft(List.empty[TokenRange]) { case (acc, (_, ranges)) =>
       ranges ::: acc
     }.sorted
-
-    val have = compactedRanges.size
-    val hostCount = meta.getAllHosts.size
-    // if we have less ranges then hosts, split the ranges until each host can serve a range
-    if(have < hostCount) {
-      val isEven = (have % hostCount) - have
-      val diff = (hostCount - have) + isEven
-
-      (0 until diff).foreach { index =>
-        val mod = index % compactedRanges.size
-        compactedRanges = compactedRanges.patch(mod, compactedRanges(mod).splitEvenly(2).asScala, 1)
-      }
-    }
 
     Console.err.println(s"Got ${compactedRanges.size} compacted ranges")
 
