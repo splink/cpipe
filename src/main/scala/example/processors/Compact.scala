@@ -14,8 +14,8 @@ object Compact {
     }
   }
 
-  def apply(m: Map[Host, List[TokenRange]]) = {
-
+  def apply(xs: List[(Set[Host], TokenRange)]) = {
+    val m = regroup(xs)
     Console.err.println(s"${m.size} hosts.")
     m.foreach { case(host, ranges) =>
       Console.err.println(s"host $host has ${ranges.size} ranges.")
