@@ -7,9 +7,6 @@ import scala.util.{Failure, Success, Try}
 
 object Extr {
 
-
-  val rps = new Rps()
-
   def main(args: Array[String]): Unit = {
     Config.fromArguments(new Arguments(args)).foreach { config =>
 
@@ -22,7 +19,7 @@ object Extr {
 
       val start = System.currentTimeMillis()
 
-      Try {
+      val rowCount = Try {
         config.mode match {
           case "import" =>
             new Importer().process(session, config)
@@ -32,17 +29,18 @@ object Extr {
             new Exporter2().process(session, config)
         }
       } match {
-        case Success(_) =>
+        case Success(count) => count
         case Failure(e) =>
           Console.err.println(
             s"\nError during '${config.mode}': message: '${if(e != null) e.getMessage else ""}'")
           System.exit(1)
+          0
       }
 
       if (config.flags.showProgress) {
         val sec = (System.currentTimeMillis() - start) / 1000
         Console.err.println(
-          s"\nProcessing ${rps.count} rows took ${ElapsedSecondFormat(sec)}s")
+          s"\nProcessing $rowCount rows took ${ElapsedSecondFormat(sec)}s")
       }
     }
 

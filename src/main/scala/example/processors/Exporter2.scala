@@ -3,7 +3,7 @@ package example.processors
 import com.datastax.driver.core._
 import com.google.common.util.concurrent.{FutureCallback, Futures}
 import example.{Config, Output, Rps}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.duration.Duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
@@ -17,6 +17,19 @@ class Exporter2 extends Processor {
   import example.JsonColumnParser._
   val printEc = ExecutionContext.fromExecutor(new ForkJoinPool(8))
   val rps = new Rps()
+
+  class Stats {
+    var misses = 0
+    var hits = 0
+
+    def miss = synchronized(misses = misses + 1)
+    def hit = synchronized(hits = hits + 1)
+
+    def hitPercentage(total: Int) = Math.round(misses / total.toDouble * 10000) / 100d
+  }
+
+  val stats = new Stats()
+
 
   override def process(session: Session, config: Config): Int = {
     val showProgress = config.flags.showProgress
@@ -41,41 +54,39 @@ class Exporter2 extends Processor {
 
     val groupedRanges = compactedRanges.grouped(config.settings.threads).toList
 
-
-    //TODO count the ratio of queries with empty/nonempty results
+    //TODO verbose mode
+    //TODO performance of println
 
     if (showProgress)
-      Output(s"Query ${compactedRanges.size * config.settings.threads} ranges, ${config.settings.threads} in parallel.")
+      Output(s"Query ${compactedRanges.size} ranges, ${config.settings.threads} in parallel.")
 
-    def execute(groups: List[List[TokenRange]]): Future[Unit] = {
+    def fetchGroups(groups: List[List[TokenRange]]): Future[Unit] = {
       groups match {
         case Nil =>
           Future.successful(())
         case head :: tail =>
           fetchNextGroup(head).map { _ =>
-            execute(tail)
+            fetchGroups(tail)
           }.recover {
             case NonFatal(e) =>
               Console.err.println(
                 s"\nError during 'import': message: '${if (e != null) e.getMessage else ""}'")
               //TODO add counter to give up after a couple of retries
-              execute(groups)
+              fetchGroups(groups)
           }.flatten
       }
     }
 
     def fetchNextGroup(group: List[TokenRange]) = {
       Future.traverse(group) { range =>
-        fetchRows(range).flatMap {
+        fetchRows(range).map {
           case results if results.nonEmpty =>
-            Future {
-              results.grouped(10).foreach { group =>
-                Console.println(
-                  group.map(Json.prettyPrint).mkString("\n")
-                )
-              }
-            }
+            stats.hit
+            outputProgress()
+            output(results)
           case _ =>
+            stats.miss
+            outputProgress()
             Future.successful(())
         }.recover {
           case NonFatal(e) =>
@@ -96,15 +107,28 @@ class Exporter2 extends Processor {
             rs.fetchMoreResults()
           }
 
-          rps.compute()
-          if (showProgress) Output(s"${rps.count} rows at $rps rows/sec.")
-
           row2Json(row)
         }
       }
     }
 
-    Await.result(execute(groupedRanges), Inf)
+    def outputProgress() = {
+      if (showProgress) {
+        Output(s"${rps.count} rows at $rps rows/sec. " +
+          s"${stats.hitPercentage(compactedRanges.size)}% misses " +
+          s"(${stats.misses} of ${compactedRanges.size} ranges. ${stats.hits} hits)")
+      }
+
+    }
+
+    def output(results: Iterator[JsObject]) = {
+      results.foreach { result =>
+        rps.compute()
+        Console.println(Json.prettyPrint(result))
+      }
+    }
+
+    Await.result(fetchGroups(groupedRanges), Inf)
 
     rps.count
   }

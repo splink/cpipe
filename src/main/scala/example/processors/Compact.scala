@@ -7,30 +7,24 @@ import scala.util.{Failure, Success, Try}
 object Compact {
 
   implicit private class TokenRangeOps(range: TokenRange) {
-    // requires the use of Murmur3Partitioner
     def contains(other: TokenRange) = {
       range.getStart.getValue.asInstanceOf[Long] <= other.getStart.getValue.asInstanceOf[Long] &&
         range.getEnd.getValue.asInstanceOf[Long] >= other.getEnd.getValue.asInstanceOf[Long]
     }
   }
 
+  /**
+    * requires the use of Murmur3Partitioner
+    */
   def apply(xs: List[(Set[Host], TokenRange)]) = {
-    val m = regroup(xs)
-    Console.err.println(s"${m.size} hosts.")
-    m.foreach { case(host, ranges) =>
-      Console.err.println(s"host $host has ${ranges.size} ranges.")
-    }
-
-    val merged = merge(m)
-    Console.err.println(s"merged for ${merged.size} hosts.")
-    merged.foreach { case(host, ranges) =>
-      Console.err.println(s"host $host has ${ranges.size} ranges.")
-    }
-
+    val regrouped = regroup(xs)
+    val merged = merge(regrouped)
     val filtered = filter(merged)
-    Console.err.println(s"filtered for ${filtered.size} hosts.")
-    filtered.foreach { case(host, ranges) =>
-      Console.err.println(s"host $host has ${ranges.size} ranges.")
+
+    Console.err.println(s"compacted ${filtered.size} hosts.")
+    regrouped.zip(filtered).foreach { case ((host1, ranges1), (host2, ranges2)) =>
+      assert(host1 == host2)
+      Console.err.println(s"Host $host1 reduced ${ranges1.size} to ${ranges2.size} ranges.")
     }
 
     filtered

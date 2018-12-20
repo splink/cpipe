@@ -55,8 +55,8 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
   val fetchSize = opt[Int](default = Some(5000),
     descr = "The amount of rows which is retrieved simultaneously. Defaults to 5000.")
 
-  val threads = opt[Int](default = Some(64),
-    descr = "The amount of parallelism during used in export2 mode. Defaults to 64 parallel requests.")
+  val threads = opt[Int](default = Some(32),
+    descr = "The amount of parallelism during used in export2 mode. Defaults to 32 parallel requests.")
 
   val consistencyLevel = choice(
     choices = Seq("ANY", "ONE", "TWO", "THREE", "QUORUM", "ALL", "LOCAL_QUORUM", "EACH_QUORUM",
@@ -70,7 +70,8 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
     descr = "Select the mode. Choose mode 'import' to import data. " +
       "Choose mode 'export' to export data (optional with a filter); " +
       "Choose mode 'export2' to export data using token ranges to increase performance and reduce load on the cluster. " +
-      "'export2' mode cannot be combined with a filter. 'export2' is only faster if the table is large")
+      "'export2' mode cannot be combined with a filter and it requires that the cluster uses Murmur3Partitioner. " +
+      "'export2' is only faster if the table is large")
 
   validateOpt (mode, filter) {
     case(Some(m), Some(f)) if m == "import" && f.nonEmpty => Left("A filter can not be used in import mode.")
