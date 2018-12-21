@@ -15,6 +15,7 @@ case object Config {
       username <- args.username.toOption
       password <- args.password.toOption
       beQuiet <- args.quiet.toOption
+      verbose <- args.verbose.toOption
       threads <- args.threads.toOption
       fetchSize <- args.fetchSize.toOption
       useCompression <- args.compression.toOption.map {
@@ -40,7 +41,7 @@ case object Config {
         Connection(hosts, port),
         Selection(keyspace, table, filter),
         Credentials(username, password),
-        Flags(!beQuiet, useCompression),
+        Flags(!beQuiet, useCompression, verbose),
         Settings(fetchSize, consistencyLevel, threads))
     }
 }
@@ -51,6 +52,6 @@ final case class Selection(keyspace: String, table: String, filter: String)
 
 final case class Credentials(username: String, password: String)
 
-final case class Flags(showProgress: Boolean, useCompression: Boolean)
+final case class Flags(showProgress: Boolean, useCompression: Boolean, verbose: Boolean)
 
 final case class Settings(fetchSize: Int, consistencyLevel: ConsistencyLevel, threads: Int)

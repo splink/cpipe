@@ -26,7 +26,11 @@ object Extr {
           case "export" =>
               new Exporter().process(session, config)
           case "export2" =>
-            new Exporter2().process(session, config)
+            if (session.getCluster.getMetadata.getPartitioner == "org.apache.cassandra.dht.Murmur3Partitioner") {
+              new Exporter2().process(session, config)
+            } else {
+              Console.err.println("mode 'export2' requires the cluster to use 'Murmur3Partitioner'")
+            }
         }
       } match {
         case Success(count) => count

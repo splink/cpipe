@@ -29,7 +29,7 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
       |""".stripMargin)
 
   val hosts = opt[List[String]](required = true,
-    descr = "The cassandra ip(s). Comma-separated, if there is more then one.")
+    descr = "The cassandra host ip(s). Comma-separated, if there is more then one.")
 
   val keyspace = opt[String](required = true,
     descr = "The name of the keyspace.")
@@ -38,7 +38,7 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
     descr = "The name of the table.")
 
   val filter = opt[List[String]](default = Some(Nil),
-    descr = "A custom filter to filter, order or limit the returned rows. For instance: 'where x in (1,2,3) limit 5'")
+    descr = "A custom filter to filter, order or limit the returned rows. For instance: 'where x = 'a' limit 5'")
 
   val username = opt[String](required = false, default = Some(""),
     descr = "The username for the cassandra cluster, if PasswordAuthenticator is used.")
@@ -52,11 +52,14 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
   val quiet = opt[Boolean](default = Some(false),
     descr = "Do not print the progress to stderr.")
 
+  val verbose = opt[Boolean](default = Some(false),
+    descr = "Do print additional information to stderr.")
+
   val fetchSize = opt[Int](default = Some(5000),
     descr = "The amount of rows which is retrieved simultaneously. Defaults to 5000.")
 
   val threads = opt[Int](default = Some(32),
-    descr = "The amount of parallelism during used in export2 mode. Defaults to 32 parallel requests.")
+    descr = "The amount of parallelism used in export2 mode. Defaults to 32 parallel requests.")
 
   val consistencyLevel = choice(
     choices = Seq("ANY", "ONE", "TWO", "THREE", "QUORUM", "ALL", "LOCAL_QUORUM", "EACH_QUORUM",
@@ -71,7 +74,7 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
       "Choose mode 'export' to export data (optional with a filter); " +
       "Choose mode 'export2' to export data using token ranges to increase performance and reduce load on the cluster. " +
       "'export2' mode cannot be combined with a filter and it requires that the cluster uses Murmur3Partitioner. " +
-      "'export2' is only faster if the table is large")
+      "'export2' works best, if the table rows are well partitioned around the cluster.")
 
   validateOpt (mode, filter) {
     case(Some(m), Some(f)) if m == "import" && f.nonEmpty => Left("A filter can not be used in import mode.")

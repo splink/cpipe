@@ -5,12 +5,12 @@ import com.google.common.util.concurrent.{FutureCallback, Futures}
 import example.{Config, Output, Rps}
 import play.api.libs.json.{JsObject, Json}
 
-import scala.concurrent.duration.Duration._
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
-import scala.util.control.NonFatal
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration._
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
 
 class Exporter2 extends Processor {
 
@@ -40,24 +40,27 @@ class Exporter2 extends Processor {
 
     val tokenId = s"token(${keys.mkString(",")})"
 
-    Console.err.println(s"data is spread across ${meta.getAllHosts.size} hosts")
+    if(config.flags.verbose) {
+      Console.err.println(s"data is spread across ${meta.getAllHosts.size} hosts.")
+      Console.err.println(s"Partitioner is '${meta.getPartitioner}'")
+    }
 
     val rangesByHost = meta.getTokenRanges.asScala.toList.map { range =>
       Set(meta.getReplicas(config.selection.keyspace, range).asScala.head) -> range
     }
 
-    val compactedRanges = Compact(rangesByHost).foldLeft(List.empty[TokenRange]) { case (acc, (_, ranges)) =>
+    val compactedRanges = Compact(rangesByHost, config.flags.verbose)
+      .foldLeft(List.empty[TokenRange]) { case (acc, (_, ranges)) =>
       ranges ::: acc
     }.sorted
 
-    Console.err.println(s"Got ${compactedRanges.size} compacted ranges")
+    if(config.flags.verbose) Console.err.println(s"Got ${compactedRanges.size} compacted ranges")
 
     val groupedRanges = compactedRanges.grouped(config.settings.threads).toList
 
-    //TODO verbose mode
-    //TODO performance of println
+    //TODO performance of println ===> buffer until then flush
 
-    if (showProgress)
+    if (showProgress && config.flags.verbose)
       Output(s"Query ${compactedRanges.size} ranges, ${config.settings.threads} in parallel.")
 
     def fetchGroups(groups: List[List[TokenRange]]): Future[Unit] = {
@@ -115,10 +118,11 @@ class Exporter2 extends Processor {
     def outputProgress() = {
       if (showProgress) {
         Output(s"${rps.count} rows at $rps rows/sec. " +
-          s"${stats.hitPercentage(compactedRanges.size)}% misses " +
-          s"(${stats.misses} of ${compactedRanges.size} ranges. ${stats.hits} hits)")
+          (if(config.flags.verbose)
+            s"${stats.hitPercentage(compactedRanges.size)}% misses " +
+              s"(${stats.misses} of ${compactedRanges.size} ranges. ${stats.hits} hits)" else "")
+        )
       }
-
     }
 
     def output(results: Iterator[JsObject]) = {
