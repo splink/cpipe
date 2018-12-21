@@ -18,7 +18,7 @@ class Importer extends Processor {
         string2Json(result).map { json =>
 
           rps.compute()
-          if (config.flags.showProgress) Output(s"${rps.count} rows at $rps rows/sec.")
+          if (config.flags.showProgress) Output.update(s"${rps.count} rows at $rps rows/sec.")
 
           session.execute(json2Query(json, config.selection.table))
         }

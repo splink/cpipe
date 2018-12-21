@@ -34,7 +34,7 @@ object JsonColumnParser {
             Column(definition.getName, value, definition.getType)
           }
         case Failure(e) =>
-          Console.err.println(s"Ooops, reading column '${definition.getName}' produced an error: ${if (e != null) e.getMessage else "null"}")
+          Output.log(s"Ooops, reading column '${definition.getName}' produced an error: ${if (e != null) e.getMessage else "null"}")
           None
       }
 
@@ -50,7 +50,7 @@ object JsonColumnParser {
       case Success(json) =>
         Some(json)
       case Failure(e) =>
-        Console.err.println(s"Could not parse JSON: '$s' ${if (e != null) e.getMessage else "null"}")
+        Output.log(s"Could not parse JSON: '$s' ${if (e != null) e.getMessage else "null"}")
         None
     }
 

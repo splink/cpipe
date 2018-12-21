@@ -1,6 +1,7 @@
 package example.processors
 
 import com.datastax.driver.core.{Host, TokenRange}
+import example.Output
 
 import scala.util.{Failure, Success, Try}
 
@@ -22,10 +23,10 @@ object Compact {
     val filtered = filter(merged)
 
     if(verbose) {
-      Console.err.println(s"compacted ${filtered.size} hosts.")
+      Output.log(s"compacted ${filtered.size} hosts.")
       regrouped.zip(filtered).foreach { case ((host1, ranges1), (host2, ranges2)) =>
         assert(host1 == host2)
-        Console.err.println(s"Host $host1 reduced ${ranges1.size} to ${ranges2.size} ranges.")
+        Output.log(s"Host $host1 reduced ${ranges1.size} to ${ranges2.size} ranges.")
       }
     }
 

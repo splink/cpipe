@@ -15,19 +15,19 @@ class Exporter extends Processor {
   override def process(session: Session, config: Config): Int = {
     val showProgress = config.flags.showProgress
 
-    if (config.flags.showProgress) Output("Execute query.")
+    if (config.flags.showProgress) Output.update("Execute query.")
 
     val statement = new SimpleStatement(s"select * from ${config.selection.table} ${config.selection.filter};")
 
     val rs = session.execute(statement)
     rs.iterator().asScala.foreach { row =>
       if (rs.getAvailableWithoutFetching < statement.getFetchSize / 2 && !rs.isFullyFetched) {
-        if (showProgress) Output(s"Got ${rps.count} rows, off to get more...")
+        if (showProgress) Output.update(s"Got ${rps.count} rows, off to get more...")
         rs.fetchMoreResults()
       }
 
       rps.compute()
-      if (showProgress) Output(s"${rps.count} rows at $rps rows/sec.")
+      if (showProgress) Output.update(s"${rps.count} rows at $rps rows/sec.")
 
       val json = row2Json(row)
       Console.println(Json.prettyPrint(json))

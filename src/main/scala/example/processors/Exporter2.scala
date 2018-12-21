@@ -41,8 +41,8 @@ class Exporter2 extends Processor {
     val tokenId = s"token(${keys.mkString(",")})"
 
     if(config.flags.verbose) {
-      Console.err.println(s"data is spread across ${meta.getAllHosts.size} hosts.")
-      Console.err.println(s"Partitioner is '${meta.getPartitioner}'")
+      Output.log(s"data is spread across ${meta.getAllHosts.size} hosts.")
+      Output.log(s"Partitioner is '${meta.getPartitioner}'")
     }
 
     val rangesByHost = meta.getTokenRanges.asScala.toList.map { range =>
@@ -54,14 +54,12 @@ class Exporter2 extends Processor {
       ranges ::: acc
     }.sorted
 
-    if(config.flags.verbose) Console.err.println(s"Got ${compactedRanges.size} compacted ranges")
+    if(config.flags.verbose) Output.log(s"Got ${compactedRanges.size} compacted ranges")
 
     val groupedRanges = compactedRanges.grouped(config.settings.threads).toList
 
-    //TODO performance of println ===> buffer until then flush
-
     if (showProgress && config.flags.verbose)
-      Output(s"Query ${compactedRanges.size} ranges, ${config.settings.threads} in parallel.")
+      Output.update(s"Query ${compactedRanges.size} ranges, ${config.settings.threads} in parallel.")
 
     def fetchGroups(groups: List[List[TokenRange]]): Future[Unit] = {
       groups match {
@@ -72,8 +70,7 @@ class Exporter2 extends Processor {
             fetchGroups(tail)
           }.recover {
             case NonFatal(e) =>
-              Console.err.println(
-                s"\nError during 'import': message: '${if (e != null) e.getMessage else ""}'")
+              Output.log(s"Error during 'import': message: '${if (e != null) e.getMessage else ""}'")
               //TODO add counter to give up after a couple of retries
               fetchGroups(groups)
           }.flatten
@@ -93,7 +90,7 @@ class Exporter2 extends Processor {
             Future.successful(())
         }.recover {
           case NonFatal(e) =>
-            Console.err.println(s"Ooops, could not fetch a row. message: ${if (e != null) e.getMessage else ""}")
+            Output.log(s"Ooops, could not fetch a row. message: ${if (e != null) e.getMessage else ""}")
             Future.successful(())
         }
       }
@@ -106,7 +103,7 @@ class Exporter2 extends Processor {
       session.executeAsync(statement).map { rs =>
         rs.iterator().asScala.map { row =>
           if (rs.getAvailableWithoutFetching < statement.getFetchSize / 2 && !rs.isFullyFetched) {
-            if (showProgress) Output(s"Got ${rps.count} rows, off to get more...")
+            if (showProgress) Output.update(s"Got ${rps.count} rows, off to get more...")
             rs.fetchMoreResults()
           }
 
@@ -117,7 +114,7 @@ class Exporter2 extends Processor {
 
     def outputProgress() = {
       if (showProgress) {
-        Output(s"${rps.count} rows at $rps rows/sec. " +
+        Output.update(s"${rps.count} rows at $rps rows/sec. " +
           (if(config.flags.verbose)
             s"${stats.hitPercentage(compactedRanges.size)}% misses " +
               s"(${stats.misses} of ${compactedRanges.size} ranges. ${stats.hits} hits)" else "")
@@ -128,12 +125,11 @@ class Exporter2 extends Processor {
     def output(results: Iterator[JsObject]) = {
       results.foreach { result =>
         rps.compute()
-        Console.println(Json.prettyPrint(result))
+        Output.render(Json.prettyPrint(result))
       }
     }
 
     Await.result(fetchGroups(groupedRanges), Inf)
-
     rps.count
   }
 

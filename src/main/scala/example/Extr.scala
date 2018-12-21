@@ -10,12 +10,12 @@ object Extr {
   def main(args: Array[String]): Unit = {
     Config.fromArguments(new Arguments(args)).foreach { config =>
 
-      if (config.flags.showProgress) Output("Connecting to cassandra.")
+      if (config.flags.showProgress) Output.update("Connecting to cassandra.")
 
       val session = createSessionFrom(config)
       session.execute(s"use ${config.selection.keyspace}")
 
-      if (config.flags.showProgress) Output(s"Connected to cassandra ${session.getCluster.getClusterName}")
+      if (config.flags.showProgress) Output.update(s"Connected to cassandra ${session.getCluster.getClusterName}")
 
       val start = System.currentTimeMillis()
 
@@ -29,13 +29,13 @@ object Extr {
             if (session.getCluster.getMetadata.getPartitioner == "org.apache.cassandra.dht.Murmur3Partitioner") {
               new Exporter2().process(session, config)
             } else {
-              Console.err.println("mode 'export2' requires the cluster to use 'Murmur3Partitioner'")
+              Output.log("mode 'export2' requires the cluster to use 'Murmur3Partitioner'")
             }
         }
       } match {
         case Success(count) => count
         case Failure(e) =>
-          Console.err.println(
+          Output.log(
             s"\nError during '${config.mode}': message: '${if(e != null) e.getMessage else ""}'")
           System.exit(1)
           0
@@ -43,7 +43,7 @@ object Extr {
 
       if (config.flags.showProgress) {
         val sec = (System.currentTimeMillis() - start) / 1000
-        Console.err.println(
+        Output.log(
           s"\nProcessing $rowCount rows took ${ElapsedSecondFormat(sec)}s")
       }
     }
