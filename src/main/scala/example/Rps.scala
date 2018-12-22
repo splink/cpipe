@@ -10,7 +10,7 @@ class Rps {
   def count = callCount
   override def toString = rps.toString
 
-  def compute() = {
+  def compute() = synchronized {
     index = index + 1
     val nextTimestamp = System.currentTimeMillis()
     if(nextTimestamp - timestamp > 1000) {
