@@ -5,12 +5,12 @@ enablePlugins(JavaAppPackaging)
 lazy val root = (project in file(".")).
   settings(
     inThisBuild(List(
-      organization := "xplr",
+      organization := "splink",
       scalaVersion := "2.12.7",
       version      := "0.1.0-SNAPSHOT"
     )),
     fork in run := true,
-    name := "extr",
+    name := "cpipe",
     libraryDependencies ++= Seq(
       logback,
       scallop,
@@ -19,5 +19,5 @@ lazy val root = (project in file(".")).
       playJson,
       scalaTest % Test,
     ),
-    mainClass in Compile := Some("example.Extr")
+    mainClass in Compile := Some("org.splink.cpipe.CPipe")
   )

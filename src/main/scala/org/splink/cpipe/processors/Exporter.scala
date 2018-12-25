@@ -1,14 +1,13 @@
-package example.processors
+package org.splink.cpipe.processors
 
 import com.datastax.driver.core.{Session, SimpleStatement}
-import example.{Config, Output, Rps}
+import org.splink.cpipe.{Config, Output, Rps}
 import play.api.libs.json.Json
+import org.splink.cpipe.JsonColumnParser._
 
 import scala.collection.JavaConverters._
 
 class Exporter extends Processor {
-
-  import example.JsonColumnParser._
 
   val rps = new Rps()
 

@@ -1,8 +1,8 @@
-package example.processors
+package org.splink.cpipe.processors
 
 import com.datastax.driver.core._
 import com.google.common.util.concurrent.{FutureCallback, Futures}
-import example.{Config, Output, Rps}
+import org.splink.cpipe.{Config, Output, Rps}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConverters._
@@ -15,8 +15,10 @@ import scala.util.control.NonFatal
 
 class Exporter2 extends Processor {
 
-  import example.JsonColumnParser._
-  val printEc = ExecutionContext.fromExecutor(new ForkJoinPool(8))
+  import org.splink.cpipe.JsonColumnParser._
+
+  val cores = Runtime.getRuntime.availableProcessors()
+  val printEc = ExecutionContext.fromExecutor(new ForkJoinPool(cores))
   val rps = new Rps()
 
   class Stats {
@@ -25,8 +27,8 @@ class Exporter2 extends Processor {
 
     def miss = synchronized(misses = misses + 1)
     def hit = synchronized(hits = hits + 1)
-
-    def hitPercentage(total: Int) = Math.round(misses / total.toDouble * 10000) / 100d
+    def hitPercentage(total: Int) =
+      Math.round(misses / total.toDouble * 10000) / 100d
   }
 
   val stats = new Stats()
@@ -41,7 +43,7 @@ class Exporter2 extends Processor {
 
     val tokenId = s"token(${keys.mkString(",")})"
 
-    if(config.flags.verbose) {
+    if (config.flags.verbose) {
       Output.log(s"data is spread across ${meta.getAllHosts.size} hosts.")
       Output.log(s"Partitioner is '${meta.getPartitioner}'")
     }
@@ -52,33 +54,27 @@ class Exporter2 extends Processor {
 
     val compactedRanges = Compact(rangesByHost, config.flags.verbose)
       .foldLeft(List.empty[TokenRange]) { case (acc, (_, ranges)) =>
-      ranges ::: acc
-    }.sorted
+        ranges ::: acc
+      }.sorted
 
-    if(config.flags.verbose) Output.log(s"Got ${compactedRanges.size} compacted ranges")
+    if (config.flags.verbose) Output.log(s"Got ${compactedRanges.size} compacted ranges")
 
     val groupedRanges = compactedRanges.grouped(config.settings.threads).toList
 
     if (showProgress && config.flags.verbose)
       Output.update(s"Query ${compactedRanges.size} ranges, ${config.settings.threads} in parallel.")
 
-    def fetchGroups(groups: List[List[TokenRange]]): Future[Unit] = {
+    def fetchGroups(groups: List[List[TokenRange]]): Future[Unit] =
       groups match {
         case Nil =>
           Future.successful(())
         case head :: tail =>
           fetchNextGroup(head).map { _ =>
             fetchGroups(tail)
-          }.recover {
-            case NonFatal(e) =>
-              Output.log(s"Error during 'import': message: '${if (e != null) e.getMessage else ""}'")
-              //TODO add counter to give up after a couple of retries
-              fetchGroups(groups)
           }.flatten
       }
-    }
 
-    def fetchNextGroup(group: List[TokenRange]) = {
+    def fetchNextGroup(group: List[TokenRange]) =
       Future.traverse(group) { range =>
         fetchRows(range).map {
           case results if results.nonEmpty =>
@@ -95,7 +91,6 @@ class Exporter2 extends Processor {
             Future.successful(())
         }
       }
-    }
 
     def fetchRows(range: TokenRange) = {
       val statement = new SimpleStatement(
@@ -114,22 +109,22 @@ class Exporter2 extends Processor {
       }
     }
 
-    def outputProgress() = {
+    def outputProgress() =
       if (showProgress) {
         Output.update(s"${rps.count} rows at $rps rows/sec. " +
-          (if(config.flags.verbose)
+          (if (config.flags.verbose)
             s"${stats.hitPercentage(compactedRanges.size)}% misses " +
               s"(${stats.misses} of ${compactedRanges.size} ranges. ${stats.hits} hits)" else "")
         )
       }
-    }
+
 
     def output(results: Iterator[JsObject]) = Future {
       results.foreach { result =>
         rps.compute()
         Output.render(Json.prettyPrint(result))
       }
-    }
+    }(printEc)
 
     Await.result(fetchGroups(groupedRanges), Inf)
     outputProgress()
@@ -163,7 +158,7 @@ class Exporter2 extends Processor {
       val merged = merge(regrouped)
       val filtered = filter(merged)
 
-      if(verbose) {
+      if (verbose) {
         Output.log(s"compacted ${filtered.size} hosts.")
         regrouped.zip(filtered).foreach { case ((host1, ranges1), (host2, ranges2)) =>
           assert(host1 == host2)

@@ -1,7 +1,7 @@
-package example.processors
+package org.splink.cpipe.processors
 
 import com.datastax.driver.core.Session
-import example.Config
+import org.splink.cpipe.Config
 
 trait Processor {
   def process(session: Session, config: Config): Int

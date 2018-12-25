@@ -1,4 +1,4 @@
-package example
+package org.splink.cpipe
 
 object Output {
   var lastLength = 0

@@ -1,4 +1,4 @@
-package example
+package org.splink.cpipe
 
 import com.datastax.driver.core.ConsistencyLevel
 

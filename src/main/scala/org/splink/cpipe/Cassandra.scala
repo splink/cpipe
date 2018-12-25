@@ -1,4 +1,4 @@
-package example
+package org.splink.cpipe
 
 import com.datastax.driver.core._
 import com.datastax.driver.core.policies.{DCAwareRoundRobinPolicy, TokenAwarePolicy}

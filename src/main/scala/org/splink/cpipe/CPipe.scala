@@ -1,11 +1,11 @@
-package example
+package org.splink.cpipe
 
-import example.processors.{Exporter, Exporter2, Importer}
+import org.splink.cpipe.processors.{Exporter, Exporter2, Importer}
 
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
-object Extr {
+object CPipe {
 
   def main(args: Array[String]): Unit = {
     Config.fromArguments(new Arguments(args)).foreach { config =>

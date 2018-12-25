@@ -1,4 +1,4 @@
-package example
+package org.splink.cpipe
 
 class Rps {
   private var index = 0
