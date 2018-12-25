@@ -7,20 +7,17 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   banner(
     """
-      |Import/export rows from a Cassandra database
+      |Import/Export rows from a Cassandra database
       |
-      |Export:
+      |Export
       |* export all rows from a table
-      |./cpipe --mode export --hosts localhost --keyspace someKeyspace --table someTable
+      |./cpipe --mode export2 --hosts localhost --keyspace someKeyspace --table someTable
       |
       |* export only rows which pass a filter
       |./cpipe --mode export --hosts localhost --keyspace someKeyspace --table someTable --filter "limit 10"
       |
-      |* export all rows from a table using token ranges which is faster for large tables
-      |./cpipe --mode export2 --hosts localhost --keyspace someKeyspace --table someTable
-      |
       |Import
-      |* import from a file:
+      |* import from a file
       |cat some.json | ./cpipe --mode import --hosts localhost --keyspace someKeyspace --table someTable
       |
       |* import an export
