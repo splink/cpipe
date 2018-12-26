@@ -1,12 +1,11 @@
-package org.splink.cpipe
+package org.splink.cpipe.config
 
 import org.rogach.scallop.ScallopConf
-
 class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
-  version("CPipe v1")
+  version(s"${BuildInfo.name} ${BuildInfo.version} ${BuildInfo.commitId}")
 
   banner(
-    """
+    s"""
       |Import/Export rows from a Cassandra database
       |
       |Export

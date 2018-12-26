@@ -2,7 +2,8 @@ package org.splink.cpipe.processors
 
 import com.datastax.driver.core._
 import com.google.common.util.concurrent.{FutureCallback, Futures}
-import org.splink.cpipe.{Config, Output, Rps}
+import org.splink.cpipe.{Output, Rps}
+import org.splink.cpipe.config.Config
 import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConverters._
