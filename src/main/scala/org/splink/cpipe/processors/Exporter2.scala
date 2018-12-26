@@ -2,7 +2,8 @@ package org.splink.cpipe.processors
 
 import com.datastax.driver.core._
 import com.google.common.util.concurrent.{FutureCallback, Futures}
-import org.splink.cpipe.{Config, Output, Rps}
+import org.splink.cpipe.{Output, Rps}
+import org.splink.cpipe.config.Config
 import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConverters._
@@ -115,7 +116,7 @@ class Exporter2 extends Processor {
         Output.update(s"${rps.count} rows at $rps rows/sec. " +
           (if (config.flags.verbose)
             s"${stats.hitPercentage(compactedRanges.size)}% misses " +
-              s"(${stats.misses} of ${compactedRanges.size} ranges. ${stats.hits} hits)" else "")
+              s"(missed ${stats.misses} of ${compactedRanges.size} ranges. ${stats.hits} hits)" else "")
         )
       }
 

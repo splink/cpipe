@@ -1,9 +1,10 @@
 package org.splink.cpipe.processors
 
 import com.datastax.driver.core.{Session, SimpleStatement}
-import org.splink.cpipe.{Config, Output, Rps}
+import org.splink.cpipe.{Output, Rps}
 import play.api.libs.json.Json
 import org.splink.cpipe.JsonColumnParser._
+import org.splink.cpipe.config.Config
 
 import scala.collection.JavaConverters._
 

@@ -1,7 +1,7 @@
 package org.splink.cpipe
 
 import org.splink.cpipe.processors.{Exporter, Exporter2, Importer}
-
+import org.splink.cpipe.config.{Config, Arguments}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
