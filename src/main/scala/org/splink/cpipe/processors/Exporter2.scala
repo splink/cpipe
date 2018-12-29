@@ -10,6 +10,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration._
 import scala.concurrent.forkjoin.ForkJoinPool
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
@@ -76,7 +77,7 @@ class Exporter2 extends Processor {
 
     def fetchNextGroup(group: List[TokenRange]) =
       Future.traverse(group) { range =>
-        fetchRows(range).map {
+        fetchRows(range).flatMap {
           case results if results.nonEmpty =>
             stats.hit
             outputProgress()
