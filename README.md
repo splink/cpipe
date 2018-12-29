@@ -6,9 +6,14 @@ Import Cassandra tables as JSON from stdin.
 Using stdin/stdout opens the door to the land of pipes and thus enables to slice and dice the stream of JSON data using command line tools. Most useful for the processing of streamed json data will probably be the infamous [jq](https://github.com/stedolan/jq).
 
 
+###### Download the [current release](https://github.com/splink/cpipe/releases/download/v0.0.1/cpipe-0.0.1.zip), unzip and run with 
+~~~bash 
+./bin/cpipe --help 
+~~~
+
 [![asciicast](https://asciinema.org/a/XLXvSasorNPkMHH5isH5U0KKq.svg)](https://asciinema.org/a/XLXvSasorNPkMHH5isH5U0KKq?autoplay=true&loop=1)
 
-Compile with:
+Build from source with [SBT](https://www.scala-sbt.org):
 ~~~bash
 sbt stage
 ~~~
