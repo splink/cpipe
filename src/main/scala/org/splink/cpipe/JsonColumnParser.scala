@@ -1,5 +1,9 @@
 package org.splink.cpipe
 
+import java.time.format.DateTimeFormatter
+import java.time.{ZoneId, ZonedDateTime}
+import java.util.Date
+
 import com.datastax.driver.core.{DataType, Row}
 import play.api.libs.json._
 
@@ -8,10 +12,16 @@ import scala.util.{Failure, Success, Try}
 
 object JsonColumnParser {
 
-  case class Column(name: String, value: String, typ: DataType)
+  case class Column(name: String, value: Object, typ: DataType)
+
+  private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
 
   def column2Json(column: Column) = {
-    val sanitized = stripControlChars(column.value)
+    val sanitized: String = column.value match {
+      case date: Date => dateFormatter.format(ZonedDateTime.ofInstant(date.toInstant, ZoneId.of("UTC")))
+      case _ => stripControlChars(column.value.toString)
+    }
+
     Try(Json.parse(sanitized)) match {
       case Success(json) =>
         val r = json match {
@@ -28,7 +38,7 @@ object JsonColumnParser {
 
   def row2Json(row: Row) =
     row.getColumnDefinitions.iterator.asScala.flatMap { definition =>
-      Try(row.getObject(definition.getName).toString) match {
+      Try(row.getObject(definition.getName)) match {
         case Success(value) =>
           column2Json {
             Column(definition.getName, value, definition.getType)
