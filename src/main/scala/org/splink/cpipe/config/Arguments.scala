@@ -65,8 +65,9 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
   val compression = choice(Seq("ON", "OFF"), default = Some("ON"),
     descr = "Use LZ4 compression and trade reduced network traffic for CPU cycles. Defaults to ON")
 
-  val mode = choice(choices = Seq("import", "export", "export2"), required = true,
+  val mode = choice(choices = Seq("import", "import2", "export", "export2"), required = true,
     descr = "Select the mode. Choose mode 'import' to import data. " +
+      "Choose mode 'import2' to import data with a prepared statement (faster, but only for tables with fixed columns); " +
       "Choose mode 'export' to export data (optional with a filter); " +
       "Choose mode 'export2' to export data using token ranges to increase performance and reduce load on the cluster. " +
       "'export2' mode cannot be combined with a filter and it requires that the cluster uses Murmur3Partitioner. " +
