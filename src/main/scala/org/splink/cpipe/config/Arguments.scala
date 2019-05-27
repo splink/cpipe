@@ -54,6 +54,9 @@ class Arguments(arguments: Seq[String]) extends ScallopConf(arguments) {
   val fetchSize = opt[Int](default = Some(5000),
     descr = "The amount of rows which is retrieved simultaneously. Defaults to 5000.")
 
+  val batchSize = opt[Int](default = Some(500),
+    descr = "The amount of rows which is saved simultaneously when using mode import2. Defaults to 500.")
+
   val threads = opt[Int](default = Some(32),
     descr = "The amount of parallelism used in export2 mode. Defaults to 32 parallel requests.")
 

@@ -19,7 +19,7 @@ class Importer2 extends Processor {
 
     Source.stdin.getLines().flatMap { line =>
       frame.push(line.toCharArray)
-    }.grouped(500).foreach { group =>
+    }.grouped(config.settings.batchSize).foreach { group =>
       val batch = new BatchStatement
       group.foreach { str =>
         string2Json(str).foreach { json =>

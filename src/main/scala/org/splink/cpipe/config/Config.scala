@@ -18,6 +18,7 @@ case object Config {
       verbose <- args.verbose.toOption
       threads <- args.threads.toOption
       fetchSize <- args.fetchSize.toOption
+      batchSize <- args.batchSize.toOption
       useCompression <- args.compression.toOption.map {
         case c if c == "ON" => true
         case _ => false
@@ -42,7 +43,7 @@ case object Config {
         Selection(keyspace, table, filter),
         Credentials(username, password),
         Flags(!beQuiet, useCompression, verbose),
-        Settings(fetchSize, consistencyLevel, threads))
+        Settings(fetchSize, batchSize, consistencyLevel, threads))
     }
 }
 
@@ -54,4 +55,4 @@ final case class Credentials(username: String, password: String)
 
 final case class Flags(showProgress: Boolean, useCompression: Boolean, verbose: Boolean)
 
-final case class Settings(fetchSize: Int, consistencyLevel: ConsistencyLevel, threads: Int)
+final case class Settings(fetchSize: Int, batchSize: Int, consistencyLevel: ConsistencyLevel, threads: Int)
