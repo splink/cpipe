@@ -11,7 +11,7 @@ Using stdin/stdout opens the door to the land of pipes and thus enables to slice
 ./bin/cpipe --help 
 ~~~
 
-[![asciicast](https://asciinema.org/a/XLXvSasorNPkMHH5isH5U0KKq.svg)](https://asciinema.org/a/XLXvSasorNPkMHH5isH5U0KKq?autoplay=true&loop=1)
+[![asciicast](https://asciinema.org/a/XLXvSasorNPkMHH5isH5U0KKq.svg)](https://asciinema.org/a/XLXvSasorNPkMHH5isH5U0KKq?autoplay=1&loop=1)
 
 Build from source with [SBT](https://www.scala-sbt.org):
 ~~~bash
