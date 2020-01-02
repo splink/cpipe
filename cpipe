@@ -1,2 +1,2 @@
 #!/bin/sh
-./target/universal/stage/bin/cpipe $@
+$(dirname "${BASH_SOURCE[0]}")/target/universal/cpipe-0.0.2/bin/cpipe $@
