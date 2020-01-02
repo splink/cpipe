@@ -13,7 +13,7 @@ unzip cpipe-0.0.2.zip
 ./bin/cpipe --help 
 ~~~
 
-as Rpm: https://github.com/splink/cpipe/releases/download/v0.0.2/cpipe-0.0.2.noarch.rpm
+as Rpm: https://github.com/splink/cpipe/releases/download/v0.0.2/cpipe-0.0.2-1.noarch.rpm
 ~~~bash
 rpm -i cpipe-0.0.2.noarch.rpm
 cpipe --help
