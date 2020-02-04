@@ -16,23 +16,29 @@ object JsonColumnParser {
   private val dateFormat = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
 
   def column2Json(column: Column) = {
-    val sanitized: String = column.value match {
-      case date: Date => dateFormat.format(date)
-      case _ => stripControlChars(column.value.toString)
-    }
+      val value = column.value
 
-    Try(Json.parse(sanitized)) match {
-      case Success(json) =>
-        val r = json match {
-          case o: JsObject => o
-          case _ => parseCassandraDataType(sanitized, column.typ)
+      if (value == null) {
+        Some(JsObject(Map(column.name -> JsNull)))
+      } else {
+        val sanitized: String = value match {
+          case date: Date => dateFormat.format(date)
+          case _ => stripControlChars(value.toString)
         }
 
-        Some(JsObject(Map(column.name -> r)))
+        Try(Json.parse(sanitized)) match {
+          case Success(json) =>
+            val r = json match {
+              case o: JsObject => o
+              case _ => parseCassandraDataType(value, sanitized, column.typ)
+            }
 
-      case Failure(_) =>
-        Some(JsObject(Map(column.name -> parseCassandraDataType(sanitized, column.typ))))
-    }
+            Some(JsObject(Map(column.name -> r)))
+
+          case Failure(_) =>
+            Some(JsObject(Map(column.name -> parseCassandraDataType(value, sanitized, column.typ))))
+        }
+      }
   }
 
   def row2Json(row: Row) =
@@ -89,7 +95,7 @@ object JsonColumnParser {
 
   def getStringToObjectMappingForTable(session: Session, table: String): Map[String, String => Object] = {
     val queryResult = session.execute(s"select * from $table limit 1")
-    queryResult.getColumnDefinitions.asScala.map{
+    queryResult.getColumnDefinitions.asScala.map {
       definition => definition.getName -> getStringToObjectConversionMethod(definition.getType)
     }.toMap
   }
@@ -123,32 +129,36 @@ object JsonColumnParser {
   def stripControlChars(s: String) =
     pattern.matcher(s).replaceAll("")
 
-  def parseCassandraDataType(a: String, dt: DataType) =
-    dt.getName match {
-      case DataType.Name.ASCII => JsString(a)
-      case DataType.Name.BLOB => JsString(a)
-      case DataType.Name.DATE => JsString(a)
-      case DataType.Name.INET => JsString(a)
-      case DataType.Name.TEXT => JsString(a)
-      case DataType.Name.TIME => JsString(a)
-      case DataType.Name.TIMESTAMP => JsString(a)
-      case DataType.Name.TIMEUUID => JsString(a)
-      case DataType.Name.UUID => JsString(a)
-      case DataType.Name.VARCHAR => JsString(a)
-      case DataType.Name.BOOLEAN => JsBoolean(a == "true")
-      case DataType.Name.BIGINT => JsNumber(BigDecimal(a))
-      case DataType.Name.DECIMAL => JsNumber(BigDecimal(a))
-      case DataType.Name.DOUBLE => JsNumber(BigDecimal(a))
-      case DataType.Name.FLOAT => JsNumber(BigDecimal(a))
-      case DataType.Name.INT => JsNumber(BigDecimal(a))
-      case DataType.Name.SMALLINT => JsNumber(BigDecimal(a))
-      case DataType.Name.TINYINT => JsNumber(BigDecimal(a))
-      case DataType.Name.VARINT => JsNumber(BigDecimal(a))
-      case DataType.Name.LIST => Json.parse(a)
-      case DataType.Name.MAP => Json.parse(a)
-      case DataType.Name.SET => Json.parse(a)
-      case DataType.Name.TUPLE => Json.parse(a)
-      case DataType.Name.UDT => Json.parse(a)
-      case _ => Json.parse(a)
-    }
+  def parseCassandraDataType(v: Object, a: String, dt: DataType) = {
+      dt.getName match {
+        case DataType.Name.ASCII => JsString(a)
+        case DataType.Name.BLOB => JsString(a)
+        case DataType.Name.DATE => JsString(a)
+        case DataType.Name.INET => JsString(a)
+        case DataType.Name.TEXT => JsString(a)
+        case DataType.Name.TIME => JsString(a)
+        case DataType.Name.TIMESTAMP => JsString(a)
+        case DataType.Name.TIMEUUID => JsString(a)
+        case DataType.Name.UUID => JsString(a)
+        case DataType.Name.VARCHAR => JsString(a)
+        case DataType.Name.BOOLEAN => JsBoolean(a == "true")
+        case DataType.Name.BIGINT => JsNumber(BigDecimal(a))
+        case DataType.Name.DECIMAL => JsNumber(BigDecimal(a))
+        case DataType.Name.DOUBLE => v match {
+          case d: Double if Double.isNaN(d) => JsNull
+          case _ => JsNumber(BigDecimal(a))
+        }
+        case DataType.Name.FLOAT => JsNumber(BigDecimal(a))
+        case DataType.Name.INT => JsNumber(BigDecimal(a))
+        case DataType.Name.SMALLINT => JsNumber(BigDecimal(a))
+        case DataType.Name.TINYINT => JsNumber(BigDecimal(a))
+        case DataType.Name.VARINT => JsNumber(BigDecimal(a))
+        case DataType.Name.LIST => Json.parse(a)
+        case DataType.Name.MAP => Json.parse(a)
+        case DataType.Name.SET => Json.parse(a)
+        case DataType.Name.TUPLE => Json.parse(a)
+        case DataType.Name.UDT => Json.parse(a)
+        case _ => Json.parse(a)
+      }
+  }
 }
