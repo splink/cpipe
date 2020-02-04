@@ -13,7 +13,15 @@ object JsonColumnParser {
 
   case class Column(name: String, value: Object, typ: DataType)
 
-  private val dateFormat = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+  // SimpleDateFormat is not thread safe
+  private val tlDateFormat = new ThreadLocal[java.text.SimpleDateFormat]
+
+  private def dateFormat = {
+    if (tlDateFormat.get() == null) {
+      tlDateFormat.set(new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+    }
+    tlDateFormat.get()
+  }
 
   def column2Json(column: Column) = {
       val value = column.value
