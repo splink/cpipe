@@ -110,12 +110,12 @@ object JsonColumnParser {
 
   def getStringToObjectConversionMethod(dataType: DataType): String => Object = (s: String) => {
       dataType.getName match {
-        case DataType.Name.DATE => dateFormat.parse(s)
-        case DataType.Name.TIMESTAMP => dateFormat.parse(s)
-        case DataType.Name.DOUBLE => new Double(s.toDouble)
-        case DataType.Name.INT => new Integer(s.toInt)
-        case DataType.Name.VARCHAR => s
-        case DataType.Name.BOOLEAN => new Boolean(s == "true")
+        case DataType.Name.DATE => nullOr(dateFormat.parse)(s)
+        case DataType.Name.TIMESTAMP => nullOr(dateFormat.parse)(s)
+        case DataType.Name.DOUBLE => nullOr{x: String => new Double(x.toDouble)}(s)
+        case DataType.Name.INT => nullOr{x: String => new Integer(x.toInt)}(s)
+        case DataType.Name.VARCHAR => nullOr(identity)(s)
+        case DataType.Name.BOOLEAN =>nullOr{x:String => new Boolean(x == "true")}(s)
         case _ => throw new IllegalArgumentException(s"Please add a mapping for the '${dataType.getName}' type")
     }
   }
@@ -129,6 +129,15 @@ object JsonColumnParser {
     val values = json.fields.map { v => jsValueToScalaObject(v._1, v._2, objectMapping) }
     batch.add(preparedStatement.bind(values : _*))
   }
+
+  def nullOr(parser: String => Object): String => Object =  (s: String) => {
+    if (s.equals("null")) {
+      null
+    } else {
+      parser(s)
+    }
+  }
+
 
   import java.util.regex.Pattern
 
