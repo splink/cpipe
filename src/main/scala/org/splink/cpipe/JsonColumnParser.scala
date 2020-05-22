@@ -1,6 +1,6 @@
 package org.splink.cpipe
 
-import java.lang.{Double, Boolean}
+import java.lang.{Boolean, Double, Short}
 import java.util.Date
 
 import com.datastax.driver.core.{BatchStatement, DataType, PreparedStatement, Row, Session}
@@ -102,6 +102,7 @@ object JsonColumnParser {
         case DataType.Name.INT => new Integer(s.toInt)
         case DataType.Name.VARCHAR => s
         case DataType.Name.BOOLEAN => new Boolean(s == "true")
+        case DataType.Name.SMALLINT => new Short(s.toShort)
         case _ => throw new IllegalArgumentException(s"Please add a mapping for the '${dataType.getName}' type")
     }
   }
