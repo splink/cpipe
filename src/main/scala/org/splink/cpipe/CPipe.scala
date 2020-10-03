@@ -1,7 +1,8 @@
 package org.splink.cpipe
 
-import org.splink.cpipe.processors.{Exporter, Exporter2, Importer}
-import org.splink.cpipe.config.{Config, Arguments}
+import org.splink.cpipe.processors.{Exporter, Exporter2, Importer, Importer2}
+import org.splink.cpipe.config.{Arguments, Config}
+
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
@@ -23,11 +24,13 @@ object CPipe {
         config.mode match {
           case "import" =>
             new Importer().process(session, config)
+          case "import2" =>
+            new Importer2().process(session, config)
           case "export" =>
-              new Exporter().process(session, config)
+              new Exporter().process(session, exportConfig(config))
           case "export2" =>
             if (session.getCluster.getMetadata.getPartitioner == "org.apache.cassandra.dht.Murmur3Partitioner") {
-              new Exporter2().process(session, config)
+              new Exporter2().process(session, exportConfig(config))
             } else {
               Output.log("mode 'export2' requires the cluster to use 'Murmur3Partitioner'")
             }
@@ -60,6 +63,16 @@ object CPipe {
     conf.settings.consistencyLevel,
     conf.settings.fetchSize,
     conf.flags.useCompression)
+
+
+  def exportConfig(config: Config): Config = {
+    if (config.settings.threads != 1) {
+      Output.log("Export is limited to 1 thread")
+      config.copy(settings = config.settings.copy(threads = 1))
+    } else {
+      config
+    }
+  }
 
 
   object ElapsedSecondFormat {
